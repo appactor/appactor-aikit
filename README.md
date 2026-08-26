@@ -60,6 +60,13 @@ Available read-only tools are:
   so the tool cannot browse or enumerate a customer base, and custom
   attributes, email, phone, push tokens, integration identifiers, and token
   ledgers are never returned.
+- `get_config`: read remote config values with their targeting rules, and
+  experiments with their variants and result summaries. Requires `config:read`
+  plus project-level `remote_config.read` / `experiments.read`.
+- `get_audit_log`: read the record of changes AI clients made to the
+  organization. Requires `audit:read`; the organization-wide scope also requires
+  the account-level `team.manage` permission. This covers MCP writes only —
+  AppActor has no organization-wide dashboard audit log.
 
 Controlled write tools are:
 
@@ -71,15 +78,24 @@ Controlled write tools are:
 - `create_project`: create a project in an organization.
 - `create_app`: add an iOS or Android app. Google credential setup is completed
   in the dashboard; credential JSON never enters the MCP conversation.
+- `manage_remote_config`: create/update remote config values, platform
+  overrides, and targeting rules.
+- `manage_experiments`: create/update experiments and variants, and start,
+  pause, resume, stop, or return one to draft.
 
 Every mutation requires a client-generated `idempotencyKey`. Reusing the same
 key and request safely replays the stored result; reusing it for a different
 request is rejected. Deletion, detach, direct-current, credential, and webhook
 secret operations are intentionally unavailable.
 
+Remote config and experiment deletion, and variant removal, are intentionally
+unavailable — as are catalog deletes, entitlement detach, credential and webhook
+secret management, and manual subscriber mutation.
+
 OAuth asks for `workspace:read`, `analytics:read`, `catalog:read`,
-`catalog:write`, `workspace:write`, and `subscribers:read`. Existing AppActor
-organization and project permissions still apply to every tool call.
+`catalog:write`, `workspace:write`, `subscribers:read`, `config:read`,
+`config:write`, and `audit:read`. Existing AppActor organization and project
+permissions still apply to every tool call.
 
 ## Claude Code Plugin
 

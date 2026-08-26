@@ -73,6 +73,9 @@ describe('MCP HTTP app', () => {
 				'catalog:write',
 				'workspace:write',
 				'subscribers:read',
+				'config:read',
+				'config:write',
+				'audit:read',
 			],
 		})
 		expect(
@@ -355,7 +358,7 @@ describe('MCP HTTP app', () => {
 		const listBody = await readJsonRpcBody(list)
 		expect(
 			(listBody.result?.tools as Array<{ name: string }>).map((t) => t.name),
-		).toHaveLength(11)
+		).toHaveLength(15)
 	})
 
 	test('returns 503 instead of 500 when the JWKS endpoint is unreachable', async () => {

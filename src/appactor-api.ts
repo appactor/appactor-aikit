@@ -9,6 +9,19 @@ import {
 	WorkspaceSchema,
 } from './contracts'
 import {
+	type AuditRequest,
+	AuditRequestSchema,
+	AuditResponseSchema,
+	type ConfigRequest,
+	ConfigRequestSchema,
+	ConfigResponseSchema,
+	ConfigWriteResponseSchema,
+	type ManageExperimentsRequest,
+	ManageExperimentsRequestSchema,
+	type ManageRemoteConfigRequest,
+	ManageRemoteConfigRequestSchema,
+} from './contracts/config'
+import {
 	type SubscriberRequest,
 	SubscriberRequestSchema,
 	SubscriberResponseSchema,
@@ -233,6 +246,52 @@ export class AppActorApiClient {
 			request,
 			SubscriberRequestSchema,
 			SubscriberResponseSchema,
+		)
+	}
+
+	getConfig(auth: InternalToolPrincipal, request: ConfigRequest) {
+		return this.postValidated(
+			'/v1/internal/mcp/config',
+			auth,
+			request,
+			ConfigRequestSchema,
+			ConfigResponseSchema,
+		)
+	}
+
+	getAuditLog(auth: InternalToolPrincipal, request: AuditRequest) {
+		return this.postValidated(
+			'/v1/internal/mcp/audit-log',
+			auth,
+			request,
+			AuditRequestSchema,
+			AuditResponseSchema,
+		)
+	}
+
+	manageRemoteConfig(
+		auth: InternalToolPrincipal,
+		request: ManageRemoteConfigRequest,
+	) {
+		return this.postValidated(
+			'/v1/internal/mcp/remote-config',
+			auth,
+			request,
+			ManageRemoteConfigRequestSchema,
+			ConfigWriteResponseSchema,
+		)
+	}
+
+	manageExperiments(
+		auth: InternalToolPrincipal,
+		request: ManageExperimentsRequest,
+	) {
+		return this.postValidated(
+			'/v1/internal/mcp/experiments',
+			auth,
+			request,
+			ManageExperimentsRequestSchema,
+			ConfigWriteResponseSchema,
 		)
 	}
 
