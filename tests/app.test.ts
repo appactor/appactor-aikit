@@ -162,6 +162,122 @@ describe('MCP HTTP app', () => {
 		expect(response.headers.get('www-authenticate')).toContain('workspace:read')
 	})
 
+	test('routes modern analytics and catalog tool calls with their exact scopes', async () => {
+		const organizationId = '00000000-0000-4000-8000-000000000001'
+		const projectId = '00000000-0000-4000-8000-000000000002'
+		const internalCalls: Array<{
+			path: string
+			method: string
+			tool: unknown
+			scope: unknown
+		}> = []
+		const fixture = await testConfig(async (request) => {
+			const authorization = request.headers.get('authorization')
+			if (!authorization)
+				throw new Error('Expected internal authorization header.')
+			const verified = await jwtVerify(
+				authorization.slice(7),
+				fixture.internalPublicKey,
+				{
+					issuer: 'appactor-mcp',
+					audience: 'appactor-api',
+				},
+			)
+			const path = new URL(request.url).pathname
+			internalCalls.push({
+				path,
+				method: request.method,
+				tool: verified.payload.tool,
+				scope: verified.payload.scope,
+			})
+			if (path.endsWith('/analytics')) {
+				return Response.json({
+					data: {
+						kind: 'overview',
+						data: { revenue: 42 },
+						generatedAt: '2026-08-26T12:00:00.000Z',
+					},
+					requestId: 'req-analytics',
+				})
+			}
+			return Response.json({
+				data: {
+					view: 'offerings',
+					data: {
+						items: [],
+						pagination: { limit: 50, hasMore: false, nextCursor: null },
+					},
+					generatedAt: '2026-08-26T12:00:00.000Z',
+				},
+				requestId: 'req-catalog',
+			})
+		})
+		const accessToken = await new SignJWT({
+			client_id: 'codex-client',
+			scope: 'analytics:read catalog:read',
+		})
+			.setProtectedHeader({ alg: 'ES256', kid: 'oauth-test' })
+			.setIssuer(fixture.config.MCP_AUTH_ISSUER)
+			.setAudience(fixture.config.MCP_RESOURCE_URL)
+			.setSubject('user-1')
+			.setIssuedAt()
+			.setExpirationTime('5m')
+			.sign(fixture.oauthKeys.privateKey)
+
+		for (const tool of [
+			{
+				name: 'query_analytics',
+				arguments: { organizationId, kind: 'overview' },
+			},
+			{
+				name: 'get_catalog',
+				arguments: { organizationId, projectId, view: 'offerings' },
+			},
+		]) {
+			const response = await fixture.app.request(
+				'https://mcp.example.com/mcp',
+				{
+					method: 'POST',
+					headers: {
+						authorization: `Bearer ${accessToken}`,
+						'content-type': 'application/json',
+						'mcp-method': 'tools/call',
+						'mcp-name': tool.name,
+						'mcp-protocol-version': '2026-07-28',
+					},
+					body: JSON.stringify({
+						jsonrpc: '2.0',
+						id: tool.name,
+						method: 'tools/call',
+						params: {
+							name: tool.name,
+							arguments: tool.arguments,
+							_meta: modernMeta(),
+						},
+					}),
+				},
+			)
+			expect(response.status).toBe(200)
+			const body = await response.json()
+			expect(body.result?.isError).not.toBe(true)
+		}
+
+		expect(internalCalls).toEqual([
+			{
+				path: '/v1/internal/mcp/analytics',
+				method: 'POST',
+				tool: 'query_analytics',
+				scope: 'analytics:read catalog:read',
+			},
+			{
+				path: '/v1/internal/mcp/catalog',
+				method: 'POST',
+				tool: 'get_catalog',
+				scope: 'analytics:read catalog:read',
+			},
+		])
+	})
+
 	test('authenticates a modern tool call and signs the exact internal operation', async () => {
 		const organizationId = '00000000-0000-4000-8000-000000000001'
 		let internalClaims: Record<string, unknown> | undefined

@@ -42,4 +42,45 @@ describe('MCP read contracts', () => {
 			}),
 		).toThrow()
 	})
+
+	test('rejects invalid ASA dates, reversed ranges, and ranges over 90 days', () => {
+		const base = { organizationId: org, appId: project, kind: 'asa' as const }
+		expect(() =>
+			AnalyticsRequestSchema.parse({
+				...base,
+				startDate: '2026-02-30',
+				endDate: '2026-03-01',
+			}),
+		).toThrow()
+		expect(() =>
+			AnalyticsRequestSchema.parse({
+				...base,
+				startDate: '2026-03-02',
+				endDate: '2026-03-01',
+			}),
+		).toThrow()
+		expect(() =>
+			AnalyticsRequestSchema.parse({
+				...base,
+				startDate: '2026-01-01',
+				endDate: '2026-04-01',
+			}),
+		).toThrow()
+	})
+
+	test('advertises UUID requirements before the request reaches AppActor API', () => {
+		expect(() =>
+			AnalyticsRequestSchema.parse({
+				organizationId: 'not-a-uuid',
+				kind: 'overview',
+			}),
+		).toThrow()
+		expect(() =>
+			CatalogRequestSchema.parse({
+				organizationId: org,
+				projectId: 'not-a-uuid',
+				view: 'offerings',
+			}),
+		).toThrow()
+	})
 })
