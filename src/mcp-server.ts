@@ -1,6 +1,6 @@
 import { type AuthInfo, McpServer } from '@modelcontextprotocol/server'
 import { z } from 'zod'
-import { type AppActorApiClient, AppActorApiError } from './appactor-api'
+import type { AppActorApiClient } from './appactor-api'
 import {
 	AnalyticsRequestSchema,
 	AppSetupSchema,
@@ -8,58 +8,31 @@ import {
 	type Workspace,
 	WorkspaceSchema,
 } from './contracts'
+import {
+	READ_TOOL_ANNOTATIONS,
+	errorResult,
+	requirePrincipal,
+	successResult,
+} from './tool-runtime'
+import { registerCatalogWriteTools } from './tools/catalog-writes'
+import { registerWorkspaceWriteTools } from './tools/workspace-writes'
 
-function scopesFrom(authInfo: AuthInfo) {
-	return [...new Set(authInfo.scopes)]
-}
-
-function requirePrincipal(authInfo: AuthInfo | undefined, scope: string) {
-	const userId = authInfo?.extra?.userId
-	if (!authInfo || typeof userId !== 'string' || !userId)
-		throw new Error('Authenticated user is missing.')
-	if (!authInfo.scopes.includes(scope))
-		throw new Error(`This tool requires the ${scope} scope.`)
-	return { userId, clientId: authInfo.clientId, scopes: scopesFrom(authInfo) }
-}
-
-function successResult<T extends Record<string, unknown>>(
-	data: T,
-	text: string,
-) {
-	return {
-		content: [{ type: 'text' as const, text }],
-		structuredContent: data,
-	}
-}
+const SERVER_INSTRUCTIONS =
+	'For every logical write, generate one idempotencyKey. If a timeout or uncertain result occurs, retry the exact same arguments with that same key; never generate a new key for the retry. Show an offering publication preview to the user and obtain approval before apply_publish. Never request store credential JSON.'
 
 function workspaceSummary(data: Workspace) {
 	const more = data.appsPagination?.hasMore ? ' More apps are available.' : ''
 	return `${data.organizations.length} organization(s), ${data.projects.length} project(s), and ${data.apps.length} app(s).${more}`
 }
 
-function errorResult(error: unknown) {
-	const message =
-		error instanceof Error ? error.message : 'Unknown AppActor error.'
-	const details =
-		error instanceof AppActorApiError
-			? { code: error.code, requestId: error.requestId, status: error.status }
-			: undefined
-	return {
-		isError: true,
-		content: [
-			{
-				type: 'text' as const,
-				text: details ? `${message}\n${JSON.stringify(details)}` : message,
-			},
-		],
-	}
-}
-
 export function createAppActorMcpServer(
 	api: AppActorApiClient,
 	authInfo?: AuthInfo,
 ) {
-	const server = new McpServer({ name: 'appactor-mcp', version: '0.1.0' })
+	const server = new McpServer(
+		{ name: 'appactor-mcp', version: '0.1.0' },
+		{ instructions: SERVER_INSTRUCTIONS },
+	)
 
 	server.registerTool(
 		'get_workspace',
@@ -82,12 +55,7 @@ export function createAppActorMcpServer(
 				appLimit: z.number().int().min(1).max(500).default(100),
 			}),
 			outputSchema: WorkspaceSchema,
-			annotations: {
-				readOnlyHint: true,
-				destructiveHint: false,
-				idempotentHint: true,
-				openWorldHint: false,
-			},
+			annotations: READ_TOOL_ANNOTATIONS,
 		},
 		async ({ organizationId, appCursor, appLimit }) => {
 			try {
@@ -111,12 +79,7 @@ export function createAppActorMcpServer(
 				'Get safe SDK setup, store connection status, and dashboard links for one accessible AppActor app.',
 			inputSchema: z.object({ organizationId: z.uuid(), appId: z.uuid() }),
 			outputSchema: AppSetupSchema,
-			annotations: {
-				readOnlyHint: true,
-				destructiveHint: false,
-				idempotentHint: true,
-				openWorldHint: false,
-			},
+			annotations: READ_TOOL_ANNOTATIONS,
 		},
 		async ({ organizationId, appId }) => {
 			try {
@@ -148,12 +111,7 @@ export function createAppActorMcpServer(
 				data: z.record(z.string(), z.unknown()),
 				generatedAt: z.string().datetime(),
 			}),
-			annotations: {
-				readOnlyHint: true,
-				destructiveHint: false,
-				idempotentHint: true,
-				openWorldHint: false,
-			},
+			annotations: READ_TOOL_ANNOTATIONS,
 		},
 		async (request) => {
 			try {
@@ -184,12 +142,7 @@ export function createAppActorMcpServer(
 				data: z.record(z.string(), z.unknown()),
 				generatedAt: z.string().datetime(),
 			}),
-			annotations: {
-				readOnlyHint: true,
-				destructiveHint: false,
-				idempotentHint: true,
-				openWorldHint: false,
-			},
+			annotations: READ_TOOL_ANNOTATIONS,
 		},
 		async (request) => {
 			try {
@@ -207,6 +160,9 @@ export function createAppActorMcpServer(
 			}
 		},
 	)
+
+	registerCatalogWriteTools(server, api, authInfo)
+	registerWorkspaceWriteTools(server, api, authInfo)
 
 	return server
 }

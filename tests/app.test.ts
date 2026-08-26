@@ -1,64 +1,15 @@
 import { afterEach, describe, expect, test } from 'bun:test'
-import {
-	SignJWT,
-	exportJWK,
-	exportPKCS8,
-	generateKeyPair,
-	jwtVerify,
-} from 'jose'
+import { SignJWT, jwtVerify } from 'jose'
 import { createApp } from '../src/app'
-import type { Config } from '../src/config'
-
-const activeServers: Array<ReturnType<typeof Bun.serve>> = []
+import {
+	modernMeta,
+	stopTestServers,
+	createMcpAppFixture as testConfig,
+} from './helpers/mcp-app-fixture'
 
 afterEach(() => {
-	for (const server of activeServers.splice(0)) server.stop(true)
+	stopTestServers()
 })
-
-async function testConfig(fetcher?: (request: Request) => Promise<Response>) {
-	const oauthKeys = await generateKeyPair('ES256', { extractable: true })
-	const internalKeys = await generateKeyPair('ES256', { extractable: true })
-	const jwk = await exportJWK(oauthKeys.publicKey)
-	Object.assign(jwk, { alg: 'ES256', kid: 'oauth-test', use: 'sig' })
-	const jwks = Bun.serve({
-		port: 0,
-		fetch: () => Response.json({ keys: [jwk] }),
-	})
-	activeServers.push(jwks)
-
-	const config: Config = {
-		NODE_ENV: 'test',
-		PORT: 3100,
-		LOG_LEVEL: 'error',
-		MCP_RESOURCE_URL: 'https://mcp.example.com/mcp',
-		MCP_AUTH_ISSUER: 'https://auth.example.com',
-		MCP_AUTH_JWKS_URL: new URL('/jwks', jwks.url).toString(),
-		APPACTOR_API_URL: 'https://api.example.com',
-		MCP_INTERNAL_JWT_PRIVATE_KEY: await exportPKCS8(internalKeys.privateKey),
-		MCP_INTERNAL_JWT_KEY_ID: 'internal-test',
-		MCP_INTERNAL_JWT_ISSUER: 'appactor-mcp',
-		MCP_INTERNAL_JWT_AUDIENCE: 'appactor-api',
-		APPACTOR_API_TIMEOUT_MS: 1_000,
-	}
-	return {
-		app: await createApp(
-			config,
-			(fetcher ??
-				(() =>
-					Promise.reject(new Error('Unexpected API call')))) as typeof fetch,
-		),
-		config,
-		oauthKeys,
-		internalPublicKey: internalKeys.publicKey,
-	}
-}
-
-function modernMeta() {
-	return {
-		'io.modelcontextprotocol/protocolVersion': '2026-07-28',
-		'io.modelcontextprotocol/clientCapabilities': {},
-	}
-}
 
 describe('MCP HTTP app', () => {
 	test('serves health and rejects non-POST MCP session operations', async () => {
@@ -114,7 +65,13 @@ describe('MCP HTTP app', () => {
 			resource: config.MCP_RESOURCE_URL,
 			authorization_servers: [config.MCP_AUTH_ISSUER],
 			bearer_methods_supported: ['header'],
-			scopes_supported: ['workspace:read', 'analytics:read', 'catalog:read'],
+			scopes_supported: [
+				'workspace:read',
+				'analytics:read',
+				'catalog:read',
+				'catalog:write',
+				'workspace:write',
+			],
 		})
 		expect(
 			(

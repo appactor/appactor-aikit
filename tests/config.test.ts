@@ -14,7 +14,14 @@ describe('loadConfig', () => {
 		const config = loadConfig(valid)
 		expect(config.PORT).toBe(3100)
 		expect(config.MCP_INTERNAL_JWT_ISSUER).toBe('appactor-mcp')
-		expect(config.APPACTOR_API_TIMEOUT_MS).toBe(8_000)
+		expect(config.APPACTOR_API_TIMEOUT_MS).toBe(35_000)
+		expect(
+			loadConfig({ ...valid, APPACTOR_API_TIMEOUT_MS: '60000' })
+				.APPACTOR_API_TIMEOUT_MS,
+		).toBe(60_000)
+		expect(() =>
+			loadConfig({ ...valid, APPACTOR_API_TIMEOUT_MS: '60001' }),
+		).toThrow()
 	})
 
 	test('rejects a non-URL MCP resource', () => {

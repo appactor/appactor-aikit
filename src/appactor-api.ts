@@ -8,6 +8,28 @@ import {
 	CatalogRequestSchema,
 	WorkspaceSchema,
 } from './contracts'
+import {
+	type CreateAppRequest,
+	CreateAppRequestSchema,
+	type CreateProjectRequest,
+	CreateProjectRequestSchema,
+	type ManageEntitlementsRequest,
+	ManageEntitlementsRequestSchema,
+	type ManageOfferingsRequest,
+	ManageOfferingsRequestSchema,
+	type ManagePackagesRequest,
+	ManagePackagesRequestSchema,
+	type ManageProductsRequest,
+	ManageProductsRequestSchema,
+} from './contracts/write'
+import {
+	CreateAppResponseSchema,
+	CreateProjectResponseSchema,
+	ManageEntitlementsResponseSchema,
+	ManageOfferingsResponseSchema,
+	ManagePackagesResponseSchema,
+	ManageProductsResponseSchema,
+} from './contracts/write-responses'
 import { InternalTokenSigner, type InternalToolPrincipal } from './internal-jwt'
 import { canonicalRequestTarget, sha256Hex } from './request-binding'
 
@@ -120,6 +142,22 @@ export class AppActorApiClient {
 		}
 	}
 
+	private postValidated<TRequest, TResponse>(
+		path: string,
+		auth: InternalToolPrincipal,
+		request: TRequest,
+		requestSchema: Zod.ZodType<TRequest>,
+		responseSchema: Zod.ZodType<TResponse>,
+	) {
+		return this.request(
+			'POST',
+			path,
+			auth,
+			JSON.stringify(requestSchema.parse(request)),
+			responseSchema,
+		)
+	}
+
 	getWorkspace(
 		auth: InternalToolPrincipal,
 		options: { organizationId?: string; appCursor?: string; appLimit?: number },
@@ -180,6 +218,72 @@ export class AppActorApiClient {
 				data: z.record(z.string(), z.unknown()),
 				generatedAt: z.string().datetime(),
 			}),
+		)
+	}
+
+	manageProducts(auth: InternalToolPrincipal, request: ManageProductsRequest) {
+		return this.postValidated(
+			'/v1/internal/mcp/products',
+			auth,
+			request,
+			ManageProductsRequestSchema,
+			ManageProductsResponseSchema,
+		)
+	}
+
+	manageEntitlements(
+		auth: InternalToolPrincipal,
+		request: ManageEntitlementsRequest,
+	) {
+		return this.postValidated(
+			'/v1/internal/mcp/entitlements',
+			auth,
+			request,
+			ManageEntitlementsRequestSchema,
+			ManageEntitlementsResponseSchema,
+		)
+	}
+
+	manageOfferings(
+		auth: InternalToolPrincipal,
+		request: ManageOfferingsRequest,
+	) {
+		return this.postValidated(
+			'/v1/internal/mcp/offerings',
+			auth,
+			request,
+			ManageOfferingsRequestSchema,
+			ManageOfferingsResponseSchema,
+		)
+	}
+
+	managePackages(auth: InternalToolPrincipal, request: ManagePackagesRequest) {
+		return this.postValidated(
+			'/v1/internal/mcp/packages',
+			auth,
+			request,
+			ManagePackagesRequestSchema,
+			ManagePackagesResponseSchema,
+		)
+	}
+
+	createProject(auth: InternalToolPrincipal, request: CreateProjectRequest) {
+		return this.postValidated(
+			'/v1/internal/mcp/projects',
+			auth,
+			request,
+			CreateProjectRequestSchema,
+			CreateProjectResponseSchema,
+		)
+	}
+
+	createApp(auth: InternalToolPrincipal, request: CreateAppRequest) {
+		return this.postValidated(
+			'/v1/internal/mcp/apps',
+			auth,
+			request,
+			CreateAppRequestSchema,
+			CreateAppResponseSchema,
 		)
 	}
 }

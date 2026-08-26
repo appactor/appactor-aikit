@@ -132,8 +132,17 @@ For each delivery:
 3. Ask three independent agents to review correctness, false positives,
    hallucinated assumptions, security boundaries, and missing tests.
 4. Fix confirmed findings and rerun validation.
-5. Merge the reviewed branch into `main` non-interactively and push.
+5. Keep the reviewed work on its feature branch until the supervised rollout.
 
 After all deliveries, run full MCP protocol tests and end-to-end local tests for
 authentication, permissions, read tools, write tools, retries, confirmation,
 redaction, and error behavior before handoff.
+
+## Current Handoff Constraint
+
+- Do not merge API or MCP feature branches into `main` while Ercan is away.
+- Do not run production migrations, change production environment variables,
+  deploy services, change DNS, or access live infrastructure.
+- Prepare reviewed feature-branch commits and a concrete rollout checklist.
+- Migration, environment setup, merge, deployment, DNS, and production smoke
+  tests will be performed later under Ercan's supervision.

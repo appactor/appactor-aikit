@@ -20,8 +20,8 @@ const ConfigSchema = z
 			.number()
 			.int()
 			.min(100)
-			.max(30_000)
-			.default(8_000),
+			.max(60_000)
+			.default(35_000),
 	})
 	.superRefine((config, ctx) => {
 		if (config.NODE_ENV === 'production' && !config.MCP_METRICS_AUTH_TOKEN) {

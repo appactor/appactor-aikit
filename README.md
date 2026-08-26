@@ -55,8 +55,25 @@ Available read-only tools are:
 - `get_catalog`: read catalog context, products, entitlements, offerings, and
   packages. Requires `catalog:read` plus project-level `catalog.read`.
 
-OAuth asks for `workspace:read`, `analytics:read`, and `catalog:read`. Existing
-organization and project permissions still apply to every tool call.
+Controlled write tools are:
+
+- `manage_products`: discover, import, and classify products.
+- `manage_entitlements`: create/update entitlements and add product bindings.
+- `manage_offerings`: create/update offerings and run the two-step
+  `preview_publish` / `apply_publish` flow.
+- `manage_packages`: create/update packages and add product bindings.
+- `create_project`: create a project in an organization.
+- `create_app`: add an iOS or Android app. Google credential setup is completed
+  in the dashboard; credential JSON never enters the MCP conversation.
+
+Every mutation requires a client-generated `idempotencyKey`. Reusing the same
+key and request safely replays the stored result; reusing it for a different
+request is rejected. Deletion, detach, direct-current, credential, and webhook
+secret operations are intentionally unavailable.
+
+OAuth asks for `workspace:read`, `analytics:read`, `catalog:read`,
+`catalog:write`, and `workspace:write`. Existing AppActor organization and
+project permissions still apply to every tool call.
 
 ## Deployment
 
@@ -64,3 +81,7 @@ Use a P-256 private key in this service and the matching public key in the
 AppActor API. `MCP_AUTH_ISSUER` must exactly match the API's `BETTER_AUTH_URL`,
 including any `/api/auth` path. Deployment and migration order are documented
 in the API repository at `docs/runbooks/mcp-delivery-1-rollout.md`.
+Delivery 3 write rollout is documented at
+`docs/runbooks/mcp-delivery-3-rollout.md` in the API repository.
+The default AppActor API deadline is 35 seconds so store discovery and setup
+calls can complete within the API's 30-second request budget.
