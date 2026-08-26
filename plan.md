@@ -17,8 +17,10 @@ tool schemas, and fixed API adapters.
   business logic, and write idempotency/audit.
 - MCP calls AppActor API through a dedicated short-lived internal JWT and a
   fixed tool-to-route allowlist. It never forwards the raw OAuth access token.
-- V1 uses four coarse OAuth scopes: `workspace:read`, `analytics:read`,
-  `catalog:write`, and `workspace:write`.
+- V1 uses five coarse OAuth scopes: `workspace:read`, `analytics:read`,
+  `catalog:read`, `catalog:write`, and `workspace:write`. Scopes are published
+  only when their delivery ships so existing grants cannot silently gain new
+  read or write capabilities.
 - V1 does not add a second project allowlist. Users can access only the
   organizations and projects already allowed by live AppActor permissions.
 
