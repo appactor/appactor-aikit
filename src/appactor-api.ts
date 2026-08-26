@@ -1,5 +1,8 @@
+import type { z } from 'zod'
 import type { Config } from './config'
-import { InternalTokenSigner, type InternalToolRequest } from './internal-jwt'
+import { AppSetupSchema, WorkspaceSchema } from './contracts'
+import { InternalTokenSigner, type InternalToolPrincipal } from './internal-jwt'
+import { canonicalRequestTarget, sha256Hex } from './request-binding'
 
 type ApiEnvelope<T> = { data: T; requestId: string }
 type ApiErrorEnvelope = {
@@ -29,36 +32,61 @@ export class AppActorApiClient {
 		this.signer = new InternalTokenSigner(config)
 	}
 
-	private async get<T>(path: string, auth: InternalToolRequest): Promise<T> {
+	ready() {
+		return this.signer.ready()
+	}
+
+	private async request<T>(
+		method: 'GET' | 'POST' | 'PATCH' | 'PUT',
+		path: string,
+		auth: InternalToolPrincipal,
+		requestBody?: string,
+		responseSchema?: z.ZodType<T>,
+	): Promise<T> {
 		const controller = new AbortController()
 		const timeout = setTimeout(
 			() => controller.abort(),
 			this.config.APPACTOR_API_TIMEOUT_MS,
 		)
 		try {
+			const url = new URL(path, this.config.APPACTOR_API_URL)
+			const token = await this.signer.sign({
+				...auth,
+				method,
+				target: canonicalRequestTarget(url),
+				bodySha256: await sha256Hex(requestBody),
+			})
 			const response = await this.fetcher(
-				new Request(new URL(path, this.config.APPACTOR_API_URL), {
+				new Request(url, {
+					method,
+					body: requestBody,
 					headers: {
 						accept: 'application/json',
-						authorization: `Bearer ${await this.signer.sign(auth)}`,
+						authorization: `Bearer ${token}`,
+						...(requestBody ? { 'content-type': 'application/json' } : {}),
 					},
 					signal: controller.signal,
 				}),
 			)
-			const body = (await response.json().catch(() => null)) as
+			const responseBody = (await response.json().catch(() => null)) as
 				| ApiEnvelope<T>
 				| ApiErrorEnvelope
 				| null
-			if (!response.ok || !body || !('data' in body)) {
-				const error = body && 'error' in body ? body.error : undefined
+			if (!response.ok || !responseBody || !('data' in responseBody)) {
+				const error =
+					responseBody && 'error' in responseBody
+						? responseBody.error
+						: undefined
 				throw new AppActorApiError(
 					error?.message ?? `AppActor API returned HTTP ${response.status}.`,
 					response.status,
 					error?.code,
-					body?.requestId,
+					responseBody?.requestId,
 				)
 			}
-			return body.data
+			return responseSchema
+				? responseSchema.parse(responseBody.data)
+				: responseBody.data
 		} catch (error) {
 			if (error instanceof AppActorApiError) throw error
 			if (error instanceof Error && error.name === 'AbortError') {
@@ -78,24 +106,36 @@ export class AppActorApiClient {
 		}
 	}
 
-	getWorkspace(auth: InternalToolRequest, organizationId?: string) {
-		const query = organizationId
-			? `?organizationId=${encodeURIComponent(organizationId)}`
-			: ''
-		return this.get<Record<string, unknown>>(
-			`/v1/internal/mcp/workspace${query}`,
+	getWorkspace(
+		auth: InternalToolPrincipal,
+		options: { organizationId?: string; appCursor?: string; appLimit?: number },
+	) {
+		const query = new URLSearchParams()
+		if (options.organizationId)
+			query.set('organizationId', options.organizationId)
+		if (options.appCursor) query.set('appCursor', options.appCursor)
+		if (options.appLimit) query.set('appLimit', String(options.appLimit))
+		const suffix = query.size ? `?${query}` : ''
+		return this.request(
+			'GET',
+			`/v1/internal/mcp/workspace${suffix}`,
 			auth,
+			undefined,
+			WorkspaceSchema,
 		)
 	}
 
 	getAppSetup(
-		auth: InternalToolRequest,
+		auth: InternalToolPrincipal,
 		organizationId: string,
 		appId: string,
 	) {
-		return this.get<Record<string, unknown>>(
+		return this.request(
+			'GET',
 			`/v1/internal/mcp/apps/${encodeURIComponent(appId)}/setup?organizationId=${encodeURIComponent(organizationId)}`,
 			auth,
+			undefined,
+			AppSetupSchema,
 		)
 	}
 }

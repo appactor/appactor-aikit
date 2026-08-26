@@ -19,6 +19,9 @@ describe('InternalTokenSigner', () => {
 			clientId: 'client-1',
 			scopes: ['workspace:read'],
 			tool: 'get_workspace',
+			method: 'GET',
+			target: '/v1/internal/mcp/workspace?organizationId=org-1',
+			bodySha256: 'body-digest',
 		})
 		const { payload, protectedHeader } = await jwtVerify(token, publicKey, {
 			issuer: 'appactor-mcp',
@@ -35,6 +38,9 @@ describe('InternalTokenSigner', () => {
 			client_id: 'client-1',
 			scope: 'workspace:read',
 			tool: 'get_workspace',
+			method: 'GET',
+			target: '/v1/internal/mcp/workspace?organizationId=org-1',
+			body_sha256: 'body-digest',
 		})
 		expect((payload.exp ?? 0) - (payload.iat ?? 0)).toBe(45)
 	})

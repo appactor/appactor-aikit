@@ -22,4 +22,17 @@ describe('loadConfig', () => {
 			loadConfig({ ...valid, MCP_RESOURCE_URL: 'not-a-url' }),
 		).toThrow()
 	})
+
+	test('requires protected metrics in production', () => {
+		expect(() => loadConfig({ ...valid, NODE_ENV: 'production' })).toThrow(
+			'MCP_METRICS_AUTH_TOKEN',
+		)
+		expect(
+			loadConfig({
+				...valid,
+				NODE_ENV: 'production',
+				MCP_METRICS_AUTH_TOKEN: 'm'.repeat(32),
+			}).NODE_ENV,
+		).toBe('production')
+	})
 })

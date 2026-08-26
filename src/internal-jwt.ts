@@ -4,11 +4,17 @@ import type { Config } from './config'
 
 const ALGORITHM = 'ES256'
 
-export type InternalToolRequest = {
+export type InternalToolPrincipal = {
 	userId: string
 	clientId: string
 	scopes: string[]
 	tool: string
+}
+
+export type InternalToolRequest = InternalToolPrincipal & {
+	method: string
+	target: string
+	bodySha256: string
 }
 
 function normalizePem(value: string) {
@@ -16,16 +22,17 @@ function normalizePem(value: string) {
 }
 
 export class InternalTokenSigner {
-	private keyPromise: ReturnType<typeof importPKCS8> | null = null
+	private readonly keyPromise: ReturnType<typeof importPKCS8>
 
-	constructor(private readonly config: Config) {}
-
-	private getKey() {
-		this.keyPromise ??= importPKCS8(
+	constructor(private readonly config: Config) {
+		this.keyPromise = importPKCS8(
 			normalizePem(this.config.MCP_INTERNAL_JWT_PRIVATE_KEY),
 			ALGORITHM,
 		)
-		return this.keyPromise
+	}
+
+	async ready() {
+		await this.keyPromise
 	}
 
 	async sign(request: InternalToolRequest): Promise<string> {
@@ -33,6 +40,9 @@ export class InternalTokenSigner {
 			scope: request.scopes.join(' '),
 			client_id: request.clientId,
 			tool: request.tool,
+			method: request.method,
+			target: request.target,
+			body_sha256: request.bodySha256,
 		})
 			.setProtectedHeader({
 				alg: ALGORITHM,
@@ -45,6 +55,6 @@ export class InternalTokenSigner {
 			.setJti(randomUUID())
 			.setIssuedAt()
 			.setExpirationTime('45s')
-			.sign(await this.getKey())
+			.sign(await this.keyPromise)
 	}
 }

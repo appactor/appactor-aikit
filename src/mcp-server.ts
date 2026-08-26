@@ -1,8 +1,7 @@
 import { type AuthInfo, McpServer } from '@modelcontextprotocol/server'
 import { z } from 'zod'
 import { type AppActorApiClient, AppActorApiError } from './appactor-api'
-
-const ObjectOutput = z.looseObject({})
+import { AppSetupSchema, type Workspace, WorkspaceSchema } from './contracts'
 
 function scopesFrom(authInfo: AuthInfo) {
 	return [...new Set(authInfo.scopes)]
@@ -17,11 +16,19 @@ function requirePrincipal(authInfo: AuthInfo | undefined, scope: string) {
 	return { userId, clientId: authInfo.clientId, scopes: scopesFrom(authInfo) }
 }
 
-function successResult(data: Record<string, unknown>) {
+function successResult<T extends Record<string, unknown>>(
+	data: T,
+	text: string,
+) {
 	return {
-		content: [{ type: 'text' as const, text: JSON.stringify(data, null, 2) }],
+		content: [{ type: 'text' as const, text }],
 		structuredContent: data,
 	}
+}
+
+function workspaceSummary(data: Workspace) {
+	const more = data.appsPagination?.hasMore ? ' More apps are available.' : ''
+	return `${data.organizations.length} organization(s), ${data.projects.length} project(s), and ${data.apps.length} app(s).${more}`
 }
 
 function errorResult(error: unknown) {
@@ -61,8 +68,14 @@ export function createAppActorMcpServer(
 					.describe(
 						'Organization ID returned by a previous get_workspace call.',
 					),
+				appCursor: z
+					.string()
+					.max(2048)
+					.optional()
+					.describe('Cursor from appsPagination.nextCursor.'),
+				appLimit: z.number().int().min(1).max(500).default(100),
 			}),
-			outputSchema: ObjectOutput,
+			outputSchema: WorkspaceSchema,
 			annotations: {
 				readOnlyHint: true,
 				destructiveHint: false,
@@ -70,15 +83,14 @@ export function createAppActorMcpServer(
 				openWorldHint: false,
 			},
 		},
-		async ({ organizationId }) => {
+		async ({ organizationId, appCursor, appLimit }) => {
 			try {
 				const principal = requirePrincipal(authInfo, 'workspace:read')
-				return successResult(
-					await api.getWorkspace(
-						{ ...principal, tool: 'get_workspace' },
-						organizationId,
-					),
+				const data = await api.getWorkspace(
+					{ ...principal, tool: 'get_workspace' },
+					{ organizationId, appCursor, appLimit },
 				)
+				return successResult(data, workspaceSummary(data))
 			} catch (error) {
 				return errorResult(error)
 			}
@@ -92,7 +104,7 @@ export function createAppActorMcpServer(
 			description:
 				'Get safe SDK setup, store connection status, and dashboard links for one accessible AppActor app.',
 			inputSchema: z.object({ organizationId: z.uuid(), appId: z.uuid() }),
-			outputSchema: ObjectOutput,
+			outputSchema: AppSetupSchema,
 			annotations: {
 				readOnlyHint: true,
 				destructiveHint: false,
@@ -103,12 +115,14 @@ export function createAppActorMcpServer(
 		async ({ organizationId, appId }) => {
 			try {
 				const principal = requirePrincipal(authInfo, 'workspace:read')
+				const data = await api.getAppSetup(
+					{ ...principal, tool: 'get_app_setup' },
+					organizationId,
+					appId,
+				)
 				return successResult(
-					await api.getAppSetup(
-						{ ...principal, tool: 'get_app_setup' },
-						organizationId,
-						appId,
-					),
+					data,
+					`${data.app.name} (${data.app.platform}) setup and connection status.`,
 				)
 			} catch (error) {
 				return errorResult(error)

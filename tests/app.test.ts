@@ -41,7 +41,7 @@ async function testConfig(fetcher?: (request: Request) => Promise<Response>) {
 		APPACTOR_API_TIMEOUT_MS: 1_000,
 	}
 	return {
-		app: createApp(
+		app: await createApp(
 			config,
 			(fetcher ??
 				(() =>
@@ -69,10 +69,27 @@ describe('MCP HTTP app', () => {
 		const response = await app.request('https://mcp.example.com/mcp')
 		expect(response.status).toBe(405)
 		expect(response.headers.get('allow')).toBe('POST')
+		expect(
+			(
+				await app.request('https://mcp.example.com/health', {
+					headers: { cookie: 'session=must-not-reach-mcp' },
+				})
+			).status,
+		).toBe(400)
+	})
+
+	test('rejects an invalid private key before serving traffic', async () => {
+		const fixture = await testConfig()
+		await expect(
+			createApp({
+				...fixture.config,
+				MCP_INTERNAL_JWT_PRIVATE_KEY: 'not-a-private-key',
+			}),
+		).rejects.toBeDefined()
 	})
 
 	test('returns an OAuth discovery challenge when no token is provided', async () => {
-		const { app } = await testConfig()
+		const { app, config } = await testConfig()
 		const response = await app.request('https://mcp.example.com/mcp', {
 			method: 'POST',
 			headers: { 'content-type': 'application/json' },
@@ -84,9 +101,65 @@ describe('MCP HTTP app', () => {
 			}),
 		})
 		expect(response.status).toBe(401)
-		expect(response.headers.get('www-authenticate')).toContain(
-			'resource_metadata=',
+		const challenge = response.headers.get('www-authenticate') ?? ''
+		const metadataUrl = challenge.match(/resource_metadata="([^"]+)"/)?.[1]
+		expect(metadataUrl).toBe(
+			'https://mcp.example.com/.well-known/oauth-protected-resource/mcp',
 		)
+		if (!metadataUrl)
+			throw new Error('Missing protected resource metadata URL.')
+		const metadataResponse = await app.request(metadataUrl)
+		expect(metadataResponse.status).toBe(200)
+		expect(await metadataResponse.json()).toEqual({
+			resource: config.MCP_RESOURCE_URL,
+			authorization_servers: [config.MCP_AUTH_ISSUER],
+			bearer_methods_supported: ['header'],
+			scopes_supported: ['workspace:read'],
+		})
+		expect(
+			(
+				await app.request(metadataUrl, {
+					method: 'HEAD',
+				})
+			).status,
+		).toBe(200)
+	})
+
+	test('returns an insufficient-scope challenge before running a tool', async () => {
+		const fixture = await testConfig()
+		const accessToken = await new SignJWT({
+			client_id: 'codex-client',
+			scope: 'analytics:read',
+		})
+			.setProtectedHeader({ alg: 'ES256', kid: 'oauth-test' })
+			.setIssuer(fixture.config.MCP_AUTH_ISSUER)
+			.setAudience(fixture.config.MCP_RESOURCE_URL)
+			.setSubject('user-1')
+			.setIssuedAt()
+			.setExpirationTime('5m')
+			.sign(fixture.oauthKeys.privateKey)
+
+		const response = await fixture.app.request('https://mcp.example.com/mcp', {
+			method: 'POST',
+			headers: {
+				authorization: `Bearer ${accessToken}`,
+				'content-type': 'application/json',
+				'mcp-method': 'tools/call',
+				'mcp-name': 'get_workspace',
+				'mcp-protocol-version': '2026-07-28',
+			},
+			body: JSON.stringify({
+				jsonrpc: '2.0',
+				id: 2,
+				method: 'tools/call',
+				params: { name: 'get_workspace', arguments: {}, _meta: modernMeta() },
+			}),
+		})
+		expect(response.status).toBe(403)
+		expect(response.headers.get('www-authenticate')).toContain(
+			'insufficient_scope',
+		)
+		expect(response.headers.get('www-authenticate')).toContain('workspace:read')
 	})
 
 	test('authenticates a modern tool call and signs the exact internal operation', async () => {
@@ -107,7 +180,15 @@ describe('MCP HTTP app', () => {
 			internalClaims = verified.payload
 			expect(new URL(request.url).pathname).toBe('/v1/internal/mcp/workspace')
 			return Response.json({
-				data: { organizations: [{ id: 'org-1', name: 'Acme' }] },
+				data: {
+					organizations: [
+						{ id: 'org-1', name: 'Acme', slug: 'acme', role: 'owner' },
+					],
+					selectedOrganization: null,
+					projects: [],
+					apps: [],
+					appsPagination: null,
+				},
 				requestId: 'req-1',
 			})
 		})
@@ -149,6 +230,8 @@ describe('MCP HTTP app', () => {
 			client_id: 'codex-client',
 			scope: 'workspace:read',
 			tool: 'get_workspace',
+			method: 'GET',
+			target: '/v1/internal/mcp/workspace?appLimit=100',
 		})
 	})
 })

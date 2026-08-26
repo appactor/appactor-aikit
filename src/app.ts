@@ -1,3 +1,4 @@
+import { timingSafeEqual } from 'node:crypto'
 import { createMcpProtectedRequestHandler } from '@better-auth/mcp'
 import { type AuthInfo, createMcpHandler } from '@modelcontextprotocol/server'
 import { Hono } from 'hono'
@@ -6,6 +7,7 @@ import { Counter, Registry } from 'prom-client'
 import { AppActorApiClient } from './appactor-api'
 import type { Config } from './config'
 import { createAppActorMcpServer } from './mcp-server'
+import { MCP_SCOPES, requiredScopeForRequest } from './scopes'
 
 function claimScopes(value: unknown): string[] {
 	if (typeof value === 'string') return value.split(/\s+/).filter(Boolean)
@@ -46,9 +48,30 @@ function requestOriginAllowed(request: Request, resource: URL) {
 	return resource.hostname === '127.0.0.1' || resource.hostname === 'localhost'
 }
 
-export function createApp(config: Config, fetcher: typeof fetch = fetch) {
+function validMetricsToken(request: Request, expected: string | undefined) {
+	if (!expected) return true
+	const actual =
+		request.headers.get('authorization')?.replace(/^Bearer\s+/i, '') ?? ''
+	const actualBytes = Buffer.from(actual)
+	const expectedBytes = Buffer.from(expected)
+	return (
+		actualBytes.length === expectedBytes.length &&
+		timingSafeEqual(actualBytes, expectedBytes)
+	)
+}
+
+export async function createApp(config: Config, fetcher: typeof fetch = fetch) {
 	const app = new Hono()
+	app.use('*', async (c, next) => {
+		if (c.req.header('cookie'))
+			return c.json(
+				{ error: 'Browser cookies are not accepted by the MCP service.' },
+				400,
+			)
+		await next()
+	})
 	const api = new AppActorApiClient(config, fetcher)
+	await api.ready()
 	const registry = new Registry()
 	const requests = new Counter({
 		name: 'appactor_mcp_http_requests_total',
@@ -61,31 +84,47 @@ export function createApp(config: Config, fetcher: typeof fetch = fetch) {
 		(context) => createAppActorMcpServer(api, context.authInfo),
 		{ legacy: 'reject' },
 	)
-	const protectedHandler = createMcpProtectedRequestHandler(
-		{
-			issuer: config.MCP_AUTH_ISSUER,
-			audience: config.MCP_RESOURCE_URL,
-			jwksUrl: config.MCP_AUTH_JWKS_URL,
-			challengeScopes: [
-				'workspace:read',
-				'analytics:read',
-				'catalog:read',
-				'catalog:write',
-				'workspace:write',
-			],
-		},
-		(request, claims) =>
-			mcpHandler.fetch(request, {
-				authInfo: toAuthInfo(request, claims, config.MCP_RESOURCE_URL),
-			}),
+	const createProtectedHandler = (requiredScope: string) =>
+		createMcpProtectedRequestHandler(
+			{
+				issuer: config.MCP_AUTH_ISSUER,
+				audience: config.MCP_RESOURCE_URL,
+				jwksUrl: config.MCP_AUTH_JWKS_URL,
+				challengeScopes: [requiredScope],
+				requiredScopes: [requiredScope],
+			},
+			(request, claims) =>
+				mcpHandler.fetch(request, {
+					authInfo: toAuthInfo(request, claims, config.MCP_RESOURCE_URL),
+				}),
+		)
+	const protectedHandlers = new Map(
+		MCP_SCOPES.map((scope) => [scope, createProtectedHandler(scope)]),
 	)
 
 	app.get('/health', (c) => c.json({ status: 'ok' }))
-	app.get('/metrics', async (c) =>
-		c.text(await registry.metrics(), 200, {
+	const protectedResourceMetadata = {
+		resource: config.MCP_RESOURCE_URL,
+		authorization_servers: [config.MCP_AUTH_ISSUER],
+		bearer_methods_supported: ['header'],
+		scopes_supported: [...MCP_SCOPES],
+	}
+	for (const path of [
+		'/.well-known/oauth-protected-resource',
+		'/.well-known/oauth-protected-resource/mcp',
+	]) {
+		app.get(path, (c) => c.json(protectedResourceMetadata))
+		app.on('HEAD', path, (c) =>
+			c.body(null, 200, { 'content-type': 'application/json' }),
+		)
+	}
+	app.get('/metrics', async (c) => {
+		if (!validMetricsToken(c.req.raw, config.MCP_METRICS_AUTH_TOKEN))
+			return c.json({ error: 'Unauthorized.' }, 401)
+		return c.text(await registry.metrics(), 200, {
 			'content-type': registry.contentType,
-		}),
-	)
+		})
+	})
 	app.post('/mcp', async (c) => {
 		const requestHost = c.req.header('host') ?? new URL(c.req.url).host
 		if (
@@ -95,7 +134,9 @@ export function createApp(config: Config, fetcher: typeof fetch = fetch) {
 			requests.inc({ route: 'mcp', status: 'rejected' })
 			return c.json({ error: 'Invalid host or origin.' }, 403)
 		}
-		const response = await protectedHandler(c.req.raw)
+		const scope = requiredScopeForRequest(c.req.raw)
+		const response = await protectedHandlers.get(scope)?.(c.req.raw)
+		if (!response) return c.json({ error: 'Unsupported MCP scope.' }, 500)
 		requests.inc({ route: 'mcp', status: String(response.status) })
 		return response
 	})
