@@ -43,8 +43,10 @@ await AppActor.configure(
 ```
 
 `configure` is a `static func` on the type and returns once the startup sequence
-has run. Calling it twice is an `alreadyConfigured` error, not a silent no-op.
-Every other API throws `AppActorError.notConfigured` until it completes.
+has run. It does not throw. A second call is a silent no-op — it logs a warning
+and returns without re-running startup — so call `reset()` first if you need to
+reconfigure. Every other API throws `AppActorError.notConfigured` until the
+first configure completes.
 
 Apple Search Ads attribution is opt-in and must be enabled **after** configure
 has returned — calling it earlier throws `notConfigured`. (The Flutter wrapper
@@ -96,8 +98,19 @@ try await AppActor.shared.setFallbackOfferings(from: bundledJSONURL)
 ## Purchase
 
 ```swift
-let result = try await AppActor.shared.purchase(package: annual)
+switch try await AppActor.shared.purchase(package: annual) {
+case .success(let customerInfo, _):
+    unlock(if: customerInfo.hasActiveEntitlement("premium"))
+case .cancelled:
+    break                       // the user dismissed the sheet; not an error
+case .pending:
+    showPendingApproval()       // Ask to Buy / SCA; resolves via the callback below
+}
 ```
+
+`AppActorPurchaseResult` is an enum — `success(customerInfo:purchaseInfo:)`,
+`cancelled`, `pending` — so the compiler forces you to handle cancellation and
+deferral rather than treating either as a failure.
 
 Overloads take `quantity:`, `placement:` (an analytics label), a StoreKit
 `Product` directly, or a `PurchaseIntent` from a promoted App Store purchase.
@@ -121,10 +134,13 @@ SwiftUI can observe the `ObservableObject`. UIKit sets closures instead:
 AppActor.shared.onCustomerInfoChanged = { info in ... }
 AppActor.shared.onPurchaseIntent = { intent in ... }        // iOS 16.4+
 AppActor.shared.onDeferredPurchaseResolved = { productId, info in ... }
+AppActor.shared.onReceiptPipelineEvent = { detail in ... }
 ```
 
-Receipt-pipeline events are exposed through the bridge only:
-`AppActorBridge.shared.setReceiptPipelineListener { event in ... }`.
+`onReceiptPipelineEvent` hands you an `AppActorReceiptPipelineEventDetail`. The
+bridge exposes the same stream as `AppActorBridge.shared.setReceiptPipelineListener`,
+with a different payload type (`AppActorBridgeReceiptEvent`) — use the property
+in Swift.
 
 `onDeferredPurchaseResolved` is how Ask-to-Buy approvals reach you; a purchase
 that returns as pending finishes here.
@@ -152,15 +168,23 @@ do {
     _ = try await AppActor.shared.purchase(package: annual)
 } catch let error as AppActorError {
     switch error.kind {
-    case .purchaseFailed:              // StoreKit rejected or the user cancelled
-    case .receiptQueuedForRetry:       // NOT a lost purchase, see below
-    case .purchaseIneligible:          // not eligible for this offer
+    case .receiptQueuedForRetry:
+        showProcessing()                        // NOT a lost purchase, see below
+    case .purchaseIneligible, .invalidOffer:
+        hideOffer()
     case .productNotAvailableInStorefront:
-    case .network:                     // retryable
+        hidePackage()
+    case .network:
+        showRetry(after: error.retryAfterSeconds)
     default:
+        showGenericFailure(requestId: error.requestId)
     }
 }
 ```
+
+A user dismissing the StoreKit sheet does **not** throw — both cancellation
+paths return `.cancelled`. `purchaseFailed` means StoreKit itself rejected the
+purchase.
 
 The full `Kind` set: `notConfigured`, `alreadyConfigured`, `validation`,
 `notAvailable`, `network`, `decoding`, `server`, `storeKitProductsMissing`,
