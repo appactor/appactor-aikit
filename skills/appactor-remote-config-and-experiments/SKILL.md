@@ -126,6 +126,48 @@ or in code.
 Do not change variant weights mid-flight unless you accept that the results are
 now a mix of two allocations. Prefer stopping and starting a clean experiment.
 
+## Doing it from Claude
+
+With the AppActor MCP server connected, both systems are readable and editable
+from the conversation.
+
+Read with `get_config`:
+
+- `view: "remote_configs"` — list, scoped by `projectId` or `appId`, filterable
+  by `status`, `platform`, and `search`.
+- `view: "remote_config"` — one config with its rules, plus the other configs
+  sharing its key (the platform overrides).
+- `view: "experiments"` — list with variant counts and result summaries.
+- `view: "experiment"` — one experiment with its variants and analysis.
+
+**Read before you write.** Every remote config update carries an
+`expectedUpdatedAt`, and the variant-weight replace carries an
+`expectedVariants` snapshot. Those come from `get_config`, and a stale value is
+rejected — which is the point: it stops two editors from silently overwriting
+each other.
+
+Write with `manage_remote_config`:
+
+- `create`, `create_scope_set` (a project default plus per-platform overrides in
+  one call), `update`, `update_scope_set`, `replace_rules`.
+- `replace_rules` replaces **every** rule on the config. Read the current rules
+  first and send the full list, or you will delete the ones you omitted.
+
+Write with `manage_experiments`:
+
+- `create`, `update`, `create_variants`, `update_variant`,
+  `replace_variant_weights`, and `set_status` with `start`, `pause`, `stop`,
+  `resume`, or `to_draft`.
+- **Starting or stopping an experiment changes what live customers see.**
+  Confirm with the user before either.
+
+Every mutation takes a client-generated `idempotencyKey`. Deleting a config, an
+experiment, or a variant is not available from MCP — those stay in the
+dashboard.
+
+`get_audit_log` shows what AI clients already changed, including operations that
+ended `pending` or `uncertain` and need a human to look at the resource.
+
 ## Debugging
 
 **A config value is not what I set.** Check, in order: has the client synced
@@ -144,6 +186,7 @@ have to agree; a `json` payload decoded as a string yields nothing.
 
 ## Related
 
-Catalog and paywall structure: `appactor-paywalls-and-offerings`.
-Platform code: `appactor-flutter`, `appactor-ios`, `appactor-android`,
+Tool mechanics and idempotency rules: `appactor-workspace`. Catalog and paywall
+structure: `appactor-paywalls-and-offerings`. Platform code:
+`appactor-flutter`, `appactor-ios`, `appactor-android`,
 `appactor-react-native`.

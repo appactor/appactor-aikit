@@ -37,6 +37,15 @@ range instead.
 `context`, `products`, `product`, `entitlements`, `entitlement`, `offerings`,
 `offering`, `packages`.
 
+`get_config { view, organizationId, ... }` reads remote config and experiments:
+`remote_configs`, `remote_config`, `experiments`, `experiment`. See
+`appactor-remote-config-and-experiments`.
+
+`get_audit_log { organizationId, scope }` reads what AI clients already changed.
+`scope: "mine"` is the default and needs no extra permission; `"organization"`
+requires `team.manage`. It covers MCP writes only — AppActor has no
+organization-wide dashboard audit log, so do not present it as one.
+
 `get_subscriber` answers questions about one named customer. See
 `appactor-troubleshooting`.
 
@@ -47,7 +56,8 @@ rather than reporting zero revenue as fact.
 ## Writing
 
 Write tools: `manage_products`, `manage_entitlements`, `manage_offerings`,
-`manage_packages`, `create_project`, `create_app`.
+`manage_packages`, `create_project`, `create_app`, `manage_remote_config`,
+`manage_experiments`.
 
 **Almost every mutation takes a client-generated `idempotencyKey`.** The two
 exceptions are `manage_products` `discover` and `manage_offerings`
@@ -75,7 +85,8 @@ So a plain timeout is **not** something to retry your way out of. If the server
 recorded the operation as uncertain, retrying the same key returns a conflict and
 a new key risks a duplicate write. Stop, report the conflict message to the user,
 and check the resource's real state with the matching read tool before doing
-anything else.
+anything else. `get_audit_log` shows the ledger entry, including whether it
+ended `pending` or `uncertain`.
 
 ## Publishing an offering: preview, then apply
 
@@ -106,7 +117,8 @@ design.
 
 ## What is intentionally missing
 
-No deletes, no entitlement detach, no direct "set current offering" without the
+No deletes anywhere — not catalog objects, not remote configs, not experiments
+or variants. No entitlement detach, no direct "set current offering" without the
 preview step, no credential upload or reveal, no key rotation, no webhook secret
 management, no editing a customer's entitlements or token balance by hand, and
 no generic raw-admin-request escape hatch.
