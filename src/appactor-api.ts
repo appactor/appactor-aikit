@@ -9,6 +9,11 @@ import {
 	WorkspaceSchema,
 } from './contracts'
 import {
+	type SubscriberRequest,
+	SubscriberRequestSchema,
+	SubscriberResponseSchema,
+} from './contracts/subscriber'
+import {
 	type CreateAppRequest,
 	CreateAppRequestSchema,
 	type CreateProjectRequest,
@@ -218,6 +223,16 @@ export class AppActorApiClient {
 				data: z.record(z.string(), z.unknown()),
 				generatedAt: z.string().datetime(),
 			}),
+		)
+	}
+
+	getSubscriber(auth: InternalToolPrincipal, request: SubscriberRequest) {
+		return this.postValidated(
+			'/v1/internal/mcp/subscribers',
+			auth,
+			request,
+			SubscriberRequestSchema,
+			SubscriberResponseSchema,
 		)
 	}
 

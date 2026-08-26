@@ -4,6 +4,7 @@ export const MCP_SCOPES = [
 	'catalog:read',
 	'catalog:write',
 	'workspace:write',
+	'subscribers:read',
 ] as const
 
 export type McpScope = (typeof MCP_SCOPES)[number]
@@ -13,6 +14,7 @@ const TOOL_SCOPES: Record<string, McpScope> = {
 	get_app_setup: 'workspace:read',
 	query_analytics: 'analytics:read',
 	get_catalog: 'catalog:read',
+	get_subscriber: 'subscribers:read',
 	manage_products: 'catalog:write',
 	manage_entitlements: 'catalog:write',
 	manage_offerings: 'catalog:write',

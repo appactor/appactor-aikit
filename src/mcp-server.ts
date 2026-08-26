@@ -15,6 +15,7 @@ import {
 	successResult,
 } from './tool-runtime'
 import { registerCatalogWriteTools } from './tools/catalog-writes'
+import { registerSubscriberReadTools } from './tools/subscriber-reads'
 import { registerWorkspaceWriteTools } from './tools/workspace-writes'
 
 const SERVER_INSTRUCTIONS =
@@ -161,6 +162,7 @@ export function createAppActorMcpServer(
 		},
 	)
 
+	registerSubscriberReadTools(server, api, authInfo)
 	registerCatalogWriteTools(server, api, authInfo)
 	registerWorkspaceWriteTools(server, api, authInfo)
 
