@@ -9,5 +9,10 @@
 		"paywall",
 		"revenue",
 		"mcp"
-	]
+	],
+	"author": {
+		"name": "AppActor",
+		"email": "dev@appactor.com"
+	},
+	"homepage": "https://appactor.com"
 }

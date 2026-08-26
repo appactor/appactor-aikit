@@ -1,6 +1,6 @@
 ---
 name: appactor-paywalls-and-offerings
-description: Model an AppActor catalog and build a paywall from it — how products, entitlements, offerings, and packages relate, what "current offering" means, how to change prices or plans without shipping an app update, and how to read or edit the catalog with the AppActor MCP tools. Use when designing or debugging a paywall, adding a plan, changing pricing, or when entitlements are not unlocking as expected.
+description: Model an AppActor catalog and build a paywall from it — how products, entitlements, offerings, and packages relate, what "current offering" means, package types, how to add a plan or change pricing without shipping an app update, and how to edit the catalog with the AppActor MCP tools. Use when designing a paywall, adding or renaming an entitlement, wiring a package to a product, or publishing an offering. For diagnosing one customer who already paid, use appactor-troubleshooting instead.
 ---
 
 # AppActor — paywalls, offerings, and the catalog
@@ -20,10 +20,21 @@ platforms.
 **Offering** — a named set of what you sell right now. One offering per project
 is `isCurrent`; that is what an SDK returns as `offerings.current`.
 
-**Package** — a slot inside an offering (`monthly`, `annual`, `lifetime`,
-`weekly`, `two_month`, `three_month`, `six_month`, `consumable`, `custom`) that
-maps to one product per platform. `annual` in your paywall resolves to the
-iOS product on iOS and the Play product on Android.
+**Package** — a slot inside an offering that maps to one product per platform.
+`annual` in your paywall resolves to the iOS product on iOS and the Play product
+on Android.
+
+The catalog package types, which are what `manage_packages` accepts, are
+`lifetime`, `annual`, `six_months`, `three_months`, `two_months`, `monthly`,
+`weekly`, and `custom` — note the **plural** month forms. There is no
+`consumable` package type; a consumable is a *product* type, sold through a
+`custom` package.
+
+The SDK enums spell the same slots slightly differently (`sixMonth`,
+`threeMonth`, `twoMonth`) and add a `consumable` case of their own. Their
+parsers accept both spellings, so reading is safe either way — but a write
+through `manage_packages` must use the catalog spelling or it is rejected before
+the request leaves the MCP server.
 
 The wiring:
 
@@ -39,7 +50,8 @@ always what is missing — check that first.
 
 ## Building a paywall
 
-1. `getOfferings()` and take `current`.
+1. Fetch offerings and take `current` — `getOfferings()` on Flutter and React
+   Native, `offerings()` on iOS and Android.
 2. Read the packages you support by type (`annual`, `monthly`, `lifetime`) —
    never by hard-coded product ID.
 3. Render `localizedPriceString` from the package. It is already formatted for
@@ -80,9 +92,10 @@ Read:
 - `get_catalog` with `view: "context"` — the fastest orientation for a project.
 - `view: "products" | "product" | "entitlements" | "entitlement" | "offerings" | "offering" | "packages"` for detail.
 
-Write (each mutation needs a client-generated `idempotencyKey` — generate one
-per logical operation, and on a timeout or uncertain result retry with **the
-same** key, never a new one):
+Write. Every mutation needs a client-generated `idempotencyKey`, with two
+exceptions: `manage_products` `discover` and `manage_offerings` `preview_publish`
+are reads in write clothing and take **no** key — passing one is a validation
+error, because these schemas reject unknown fields.
 
 - `manage_products` — `discover` reads what the connected store actually has,
   `import` brings SKUs into AppActor, `classify` sets product type and display name.
@@ -112,20 +125,17 @@ secret management, no editing a customer's entitlements by hand. Those stay in
 the dashboard on purpose. If a task needs one of them, say so and point at the
 dashboard rather than looking for a workaround.
 
-## Debugging "the customer paid but nothing unlocked"
+## When a catalog change does not take effect
 
-In order:
-
-1. Is the product attached to the entitlement? (`get_catalog` with
-   `view: "product"`.)
-2. Is the app checking the same `lookupKey` the entitlement uses?
-3. Is the app gating on `customerInfo` entitlements, or on the purchase result?
-4. Does the customer's live state actually show the entitlement?
-   `get_subscriber` answers this directly — see `appactor-troubleshooting`.
-5. Was the receipt queued rather than posted? A `receiptQueuedForRetry` error is
-   a paid purchase still in flight, not a failure.
+If a purchase grants nothing, the catalog side of it is the product-to-
+entitlement link: `get_catalog` with `view: "product"` shows which entitlements a
+product grants, and an empty list there explains the symptom on its own. If the
+link is present and the customer still has no access, the question has moved off
+the catalog — diagnose the customer with `appactor-troubleshooting`.
 
 ## Related
 
+Tool mechanics, idempotency rules, and how to find organization/project IDs:
+`appactor-workspace`. Diagnosing one customer: `appactor-troubleshooting`.
 Platform code: `appactor-flutter`, `appactor-ios`, `appactor-android`,
-`appactor-react-native`. Live customer state: `appactor-troubleshooting`.
+`appactor-react-native`.

@@ -28,7 +28,10 @@ for when someone is wiring up the SDK for the first time.
 
 `query_analytics { kind, organizationId, ... }` covers `overview`, `revenue`,
 `users`, `trials`, `transactions`, `asa`, `experiments`, and `refund_defense`.
-Scope narrows with `projectId` or `appId`; windows are 7, 28, or 90 days.
+Scope narrows with `projectId` or `appId`. `overview`, `revenue`, `users`, and
+`trials` take a `windowDays` of 7, 28, or 90; `refund_defense` takes any 1-90;
+`transactions` and `asa` have no window and paginate or take an explicit date
+range instead.
 
 `get_catalog { view, organizationId, projectId, ... }` reads the catalog:
 `context`, `products`, `product`, `entitlements`, `entitlement`, `offerings`,
@@ -46,19 +49,34 @@ rather than reporting zero revenue as fact.
 Write tools: `manage_products`, `manage_entitlements`, `manage_offerings`,
 `manage_packages`, `create_project`, `create_app`.
 
-**Every mutation takes a client-generated `idempotencyKey`.** The rules matter:
+**Almost every mutation takes a client-generated `idempotencyKey`.** The two
+exceptions are `manage_products` `discover` and `manage_offerings`
+`preview_publish` — they are reads in write clothing and take no key. Passing one
+is a validation error, because those schemas reject unknown fields.
+
+For the rest, the rules matter:
 
 - Generate **one key per logical operation**, before the first attempt.
-- On a timeout, a 5xx, or any uncertain result, retry **the exact same arguments
-  with the same key**. The server replays the stored result instead of
-  duplicating the write.
 - Never generate a fresh key for a retry. That is how duplicate projects, apps,
   and catalog objects get created.
 - Reusing a key with *different* arguments is rejected as a conflict. That is
   the guard working, not a bug to route around.
 
-A failed operation burns its key: after a genuine business or validation
-failure, fix the input and use a new key.
+What a retry with the same key actually does depends on what the server recorded:
+
+| Recorded outcome | Retry with the same key |
+|---|---|
+| succeeded | replays the stored result; no second mutation |
+| failed | rejected — the key is burned. Fix the input and use a **new** key |
+| pending | rejected as a conflict: the operation is still in flight or was interrupted |
+| uncertain | rejected as a conflict: the outcome could not be confirmed |
+
+So a plain timeout is **not** something to retry your way out of. If the server
+recorded the operation as uncertain, retrying the same key returns a conflict and
+a new key risks a duplicate write. Stop, report the conflict message to the user,
+and check the resource's real state with the matching read tool before doing
+anything else. `get_audit_log` shows the ledger entry, including whether it ended
+`pending` or `uncertain`.
 
 ## Publishing an offering: preview, then apply
 
@@ -99,9 +117,8 @@ a way around it.
 
 ## Reporting numbers
 
-Analytics results carry `generatedAt`, and some carry staleness metadata. When
-you quote a revenue or conversion number, quote the scope and the window with
-it — "28-day revenue for project X" — because the same metric at organization,
+Analytics results carry `generatedAt`. When you quote a revenue or conversion
+number, quote the scope and the window with it — "28-day revenue for project X" — because the same metric at organization,
 project, and app scope are three different numbers.
 
 ## Related

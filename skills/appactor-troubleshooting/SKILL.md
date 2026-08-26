@@ -1,6 +1,6 @@
 ---
 name: appactor-troubleshooting
-description: Diagnose AppActor problems — a customer who paid but has no access, entitlements not unlocking, purchases failing, receipts stuck in the retry queue, sandbox versus production confusion, and signature verification failures. Use when investigating a support report about a subscription, a failed purchase, or missing access in an app that uses AppActor.
+description: Diagnose a specific AppActor customer or failure — someone who paid but has no access, a purchase that failed, receipts stuck in the retry queue, sandbox versus production confusion, and signature verification failures. Use when investigating a support report or a bug affecting real customers. For designing a paywall or changing the catalog, use appactor-paywalls-and-offerings instead.
 ---
 
 # AppActor — troubleshooting
@@ -141,6 +141,7 @@ request answerable.
 
 ## Related
 
-Catalog structure: `appactor-paywalls-and-offerings`. Platform specifics:
-`appactor-flutter`, `appactor-ios`, `appactor-android`,
+Finding organization/project IDs and the rules for the write tools:
+`appactor-workspace`. Catalog structure: `appactor-paywalls-and-offerings`.
+Platform specifics: `appactor-flutter`, `appactor-ios`, `appactor-android`,
 `appactor-react-native`.

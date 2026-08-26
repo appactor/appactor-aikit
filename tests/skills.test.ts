@@ -22,11 +22,15 @@ const skillNames = readdirSync(skillsDir).filter((entry) =>
 )
 
 describe('AppActor plugin', () => {
-	test('declares the remote MCP server', () => {
+	test('declares the remote MCP server under mcpServers', () => {
 		const mcp = JSON.parse(
 			readFileSync(join(pluginRoot, '.mcp.json'), 'utf8'),
-		) as Record<string, { type: string; url: string }>
-		expect(mcp.appactor).toEqual({
+		) as { mcpServers?: Record<string, { type: string; url: string }> }
+		// The wrapped form is what the documented plugin format uses, and it is
+		// also the only shape project-scoped .mcp.json loading accepts -- this
+		// file sits at the root of a repo people develop in, so it has to work
+		// in both roles.
+		expect(mcp.mcpServers?.appactor).toEqual({
 			type: 'http',
 			url: 'https://mcp.appactor.com/mcp',
 		})
@@ -35,10 +39,16 @@ describe('AppActor plugin', () => {
 	test('has a plugin manifest with a name and description', () => {
 		const manifest = JSON.parse(
 			readFileSync(join(pluginRoot, '.claude-plugin', 'plugin.json'), 'utf8'),
-		) as { name?: string; description?: string; version?: string }
+		) as {
+			name?: string
+			description?: string
+			version?: string
+			author?: { name?: string }
+		}
 		expect(manifest.name).toBe('appactor')
 		expect(manifest.description?.length).toBeGreaterThan(20)
 		expect(manifest.version).toMatch(/^\d+\.\d+\.\d+$/)
+		expect(manifest.author?.name).toBeTruthy()
 	})
 
 	test('ships every skill this plugin is meant to provide', () => {
@@ -74,6 +84,19 @@ describe.each(skillNames)('skill %s', (skillName) => {
 		expect(
 			source.split('---\n').slice(2).join('---\n').trim().length,
 		).toBeGreaterThan(400)
+	})
+
+	test('is reachable from at least one other skill', () => {
+		// A skill nothing points at is a skill that rarely loads. This caught
+		// appactor-workspace, which carried the tool rules but was orphaned.
+		const referencedElsewhere = skillNames
+			.filter((other) => other !== skillName)
+			.some((other) =>
+				readFileSync(join(skillsDir, other, 'SKILL.md'), 'utf8').includes(
+					`\`${skillName}\``,
+				),
+			)
+		expect(referencedElsewhere).toBe(true)
 	})
 
 	test('only cross-references skills that exist', () => {

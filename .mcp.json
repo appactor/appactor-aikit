@@ -1,6 +1,8 @@
 {
-	"appactor": {
-		"type": "http",
-		"url": "https://mcp.appactor.com/mcp"
+	"mcpServers": {
+		"appactor": {
+			"type": "http",
+			"url": "https://mcp.appactor.com/mcp"
+		}
 	}
 }
