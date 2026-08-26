@@ -67,7 +67,7 @@ const transactionRecord = {
 	conversionKind: null,
 	environment: 'production',
 	origin: 'store',
-	originLabel: 'Store',
+	originLabel: null,
 	placement: null,
 	amountUsd: 49.99,
 	originalAmount: 1799,
@@ -276,7 +276,58 @@ describe('get_subscriber tool', () => {
 	})
 })
 
+describe('get_subscriber upstream contract failures', () => {
+	test('reports an invalid upstream payload instead of passing it through', async () => {
+		const { body } = await callGetSubscriber(
+			{
+				...getResponse,
+				data: {
+					...getResponse.data,
+					subscriber: { ...subscriberSummary, entitlementCounts: undefined },
+				},
+			},
+			{ action: 'get', organizationId, subscriberId },
+		)
+		expect(body.result.isError).toBe(true)
+		expect(body.result.content[0].text).toContain('UPSTREAM_CONTRACT_INVALID')
+	})
+
+	test('rejects a mistyped monetary amount rather than reporting it', async () => {
+		const { body } = await callGetSubscriber(
+			{
+				...getResponse,
+				data: {
+					...getResponse.data,
+					transactions: [{ ...transactionRecord, amountUsd: '49.99' }],
+				},
+			},
+			{ action: 'get', organizationId, subscriberId },
+		)
+		expect(body.result.isError).toBe(true)
+		expect(body.result.content[0].text).toContain('UPSTREAM_CONTRACT_INVALID')
+	})
+})
+
 describe('subscriber contracts', () => {
+	test('caps the transaction window at what the API can actually read', () => {
+		expect(() =>
+			SubscriberRequestSchema.parse({
+				action: 'get',
+				organizationId,
+				subscriberId,
+				transactionLimit: 26,
+			}),
+		).toThrow()
+		expect(
+			SubscriberRequestSchema.parse({
+				action: 'get',
+				organizationId,
+				subscriberId,
+				transactionLimit: 25,
+			}),
+		).toMatchObject({ transactionLimit: 25 })
+	})
+
 	test('rejects arguments that would widen the search surface', () => {
 		expect(() =>
 			SubscriberRequestSchema.parse({

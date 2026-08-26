@@ -32,7 +32,9 @@ export const SubscriberRequestSchema = z.discriminatedUnion('action', [
 			appUserId: AppUserId.optional(),
 			projectId: ResourceId.optional(),
 			appId: ResourceId.optional(),
-			transactionLimit: z.number().int().min(1).max(50).default(20),
+			// The AppActor API reads at most 25 transactions for this projection;
+			// asking for more would report a truncated history as complete.
+			transactionLimit: z.number().int().min(1).max(25).default(20),
 		})
 		.strict(),
 ])
