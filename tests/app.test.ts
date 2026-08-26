@@ -163,6 +163,7 @@ describe('MCP HTTP app', () => {
 	})
 
 	test('authenticates a modern tool call and signs the exact internal operation', async () => {
+		const organizationId = '00000000-0000-4000-8000-000000000001'
 		let internalClaims: Record<string, unknown> | undefined
 		const fixture = await testConfig(async (request) => {
 			const authorization = request.headers.get('authorization')
@@ -182,12 +183,23 @@ describe('MCP HTTP app', () => {
 			return Response.json({
 				data: {
 					organizations: [
-						{ id: 'org-1', name: 'Acme', slug: 'acme', role: 'owner' },
+						{ id: organizationId, name: 'Acme', slug: 'acme', role: 'owner' },
 					],
-					selectedOrganization: null,
+					selectedOrganization: {
+						id: organizationId,
+						name: 'Acme',
+						slug: 'acme',
+						role: 'owner',
+						access: {
+							accountPermissions: ['analytics.read'],
+							projectAccessMode: 'all_projects',
+							projectPermissions: ['project.view'],
+							projectPermissionsByProject: [],
+						},
+					},
 					projects: [],
 					apps: [],
-					appsPagination: null,
+					appsPagination: { limit: 100, hasMore: false, nextCursor: null },
 				},
 				requestId: 'req-1',
 			})
@@ -217,7 +229,11 @@ describe('MCP HTTP app', () => {
 				jsonrpc: '2.0',
 				id: 7,
 				method: 'tools/call',
-				params: { name: 'get_workspace', arguments: {}, _meta: modernMeta() },
+				params: {
+					name: 'get_workspace',
+					arguments: { organizationId },
+					_meta: modernMeta(),
+				},
 			}),
 		})
 		const body = await response.json()
@@ -231,7 +247,7 @@ describe('MCP HTTP app', () => {
 			scope: 'workspace:read',
 			tool: 'get_workspace',
 			method: 'GET',
-			target: '/v1/internal/mcp/workspace?appLimit=100',
+			target: `/v1/internal/mcp/workspace?appLimit=100&organizationId=${organizationId}`,
 		})
 	})
 })

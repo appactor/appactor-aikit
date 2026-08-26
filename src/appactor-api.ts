@@ -1,4 +1,4 @@
-import type { z } from 'zod'
+import { ZodError, type z } from 'zod'
 import type { Config } from './config'
 import { AppSetupSchema, WorkspaceSchema } from './contracts'
 import { InternalTokenSigner, type InternalToolPrincipal } from './internal-jwt'
@@ -89,6 +89,13 @@ export class AppActorApiClient {
 				: responseBody.data
 		} catch (error) {
 			if (error instanceof AppActorApiError) throw error
+			if (error instanceof ZodError) {
+				throw new AppActorApiError(
+					'AppActor API returned an invalid response contract.',
+					502,
+					'UPSTREAM_CONTRACT_INVALID',
+				)
+			}
 			if (error instanceof Error && error.name === 'AbortError') {
 				throw new AppActorApiError(
 					'AppActor API request timed out.',

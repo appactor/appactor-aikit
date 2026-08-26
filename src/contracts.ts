@@ -3,6 +3,25 @@ import { z } from 'zod'
 const Id = z.string().min(1)
 const NullableUrl = z.url().nullable()
 
+const AppleWebhookStatusSchema = z.object({
+	state: z.enum(['not_verified', 'checking', 'verified', 'failed']),
+	source: z.enum(['test_notification', 'live_notification']).nullable(),
+	verifiedAt: z.string().nullable(),
+	lastCheckedAt: z.string().nullable(),
+	lastCheckRequestedAt: z.string().nullable(),
+	lastError: z.string().nullable(),
+	warning: z.string().nullable(),
+	environment: z.enum(['sandbox', 'production']).nullable(),
+	testNotificationStatus: z
+		.object({
+			state: z.enum(['pending', 'success', 'failed']),
+			result: z.string().nullable(),
+			checkedAt: z.string().nullable(),
+			attemptDate: z.string().nullable(),
+		})
+		.nullable(),
+})
+
 export const PaginationSchema = z.object({
 	limit: z.number().int().positive(),
 	hasMore: z.boolean(),
@@ -28,7 +47,12 @@ export const WorkspaceSchema = z.object({
 				accountPermissions: z.array(z.string()),
 				projectAccessMode: z.string(),
 				projectPermissions: z.array(z.string()),
-				projectPermissionsByProject: z.record(z.string(), z.array(z.string())),
+				projectPermissionsByProject: z.array(
+					z.object({
+						projectId: Id,
+						permissions: z.array(z.string()),
+					}),
+				),
 			}),
 		})
 		.nullable(),
@@ -71,7 +95,7 @@ export const AppSetupSchema = z.object({
 	connections: z.object({
 		apple: z.unknown().nullable(),
 		google: z.unknown().nullable(),
-		appleWebhookStatus: z.unknown().nullable(),
+		appleWebhookStatus: AppleWebhookStatusSchema.nullable(),
 	}),
 	links: z.object({
 		dashboard: z.url(),
