@@ -1,0 +1,13 @@
+{
+	"name": "appactor",
+	"description": "AppActor for Claude Code — the remote MCP server for your AppActor workspace plus skills for integrating the Flutter, iOS, Android, and React Native SDKs, building paywalls, and running remote config and experiments.",
+	"version": "0.1.0",
+	"keywords": [
+		"appactor",
+		"in-app-purchase",
+		"subscriptions",
+		"paywall",
+		"revenue",
+		"mcp"
+	]
+}

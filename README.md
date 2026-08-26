@@ -81,6 +81,36 @@ OAuth asks for `workspace:read`, `analytics:read`, `catalog:read`,
 `catalog:write`, `workspace:write`, and `subscribers:read`. Existing AppActor
 organization and project permissions still apply to every tool call.
 
+## Claude Code Plugin
+
+This repository is also a Claude Code plugin. Installing it wires up the remote
+MCP server **and** a set of skills that teach the AppActor SDKs and catalog
+model, so an agent can go from "add subscriptions to this app" to working code
+without the operator pasting documentation.
+
+```text
+.claude-plugin/plugin.json   plugin manifest
+.mcp.json                    declares https://mcp.appactor.com/mcp
+skills/                      one directory per skill
+```
+
+Skills:
+
+| Skill | Covers |
+| --- | --- |
+| `appactor-workspace` | using the MCP tools: orientation, analytics, idempotent writes, preview/apply |
+| `appactor-paywalls-and-offerings` | products, entitlements, offerings, packages, and building a paywall from them |
+| `appactor-remote-config-and-experiments` | config keys, targeting rules, variants, traffic weights, primary metrics |
+| `appactor-troubleshooting` | "paid but no access", stuck receipts, sandbox confusion, signature failures |
+| `appactor-flutter` | `appactor_flutter` |
+| `appactor-ios` | the `AppActor` Swift package |
+| `appactor-android` | `com.appactor:appactor-android` |
+| `appactor-react-native` | `appactor-react-native` |
+
+The SDK skills are written from the SDK sources rather than from the docs site,
+so the signatures, enum cases, error codes, and ordering constraints in them
+match what the code actually does.
+
 ## Deployment
 
 Use a P-256 private key in this service and the matching public key in the
