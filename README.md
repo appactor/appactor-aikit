@@ -43,12 +43,20 @@ discover AppActor OAuth automatically, open the AppActor login/consent URL in a
 browser, and store their own OAuth token. The AppActor session cookie never
 leaves the browser.
 
-The first tools are:
+Available read-only tools are:
 
 - `get_workspace`: list organizations, then pass an organization ID to list
   accessible projects and apps.
 - `get_app_setup`: return safe SDK keys, store connection status, and setup
   links for an accessible app.
+- `query_analytics`: read overview, revenue, users, trials, transactions,
+  Apple Ads, experiments, and refund-defense analytics. Requires
+  `analytics:read` plus the matching AppActor dashboard permission.
+- `get_catalog`: read catalog context, products, entitlements, offerings, and
+  packages. Requires `catalog:read` plus project-level `catalog.read`.
+
+OAuth asks for `workspace:read`, `analytics:read`, and `catalog:read`. Existing
+organization and project permissions still apply to every tool call.
 
 ## Deployment
 

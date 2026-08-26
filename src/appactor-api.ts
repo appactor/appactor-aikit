@@ -1,6 +1,13 @@
-import { ZodError, type z } from 'zod'
+import { type z as Zod, ZodError, z } from 'zod'
 import type { Config } from './config'
-import { AppSetupSchema, WorkspaceSchema } from './contracts'
+import {
+	type AnalyticsRequest,
+	AnalyticsRequestSchema,
+	AppSetupSchema,
+	type CatalogRequest,
+	CatalogRequestSchema,
+	WorkspaceSchema,
+} from './contracts'
 import { InternalTokenSigner, type InternalToolPrincipal } from './internal-jwt'
 import { canonicalRequestTarget, sha256Hex } from './request-binding'
 
@@ -41,7 +48,7 @@ export class AppActorApiClient {
 		path: string,
 		auth: InternalToolPrincipal,
 		requestBody?: string,
-		responseSchema?: z.ZodType<T>,
+		responseSchema?: Zod.ZodType<T>,
 	): Promise<T> {
 		const controller = new AbortController()
 		const timeout = setTimeout(
@@ -143,6 +150,36 @@ export class AppActorApiClient {
 			auth,
 			undefined,
 			AppSetupSchema,
+		)
+	}
+
+	queryAnalytics(auth: InternalToolPrincipal, request: AnalyticsRequest) {
+		const body = JSON.stringify(AnalyticsRequestSchema.parse(request))
+		return this.request(
+			'POST',
+			'/v1/internal/mcp/analytics',
+			auth,
+			body,
+			z.object({
+				kind: z.string(),
+				data: z.record(z.string(), z.unknown()),
+				generatedAt: z.string().datetime(),
+			}),
+		)
+	}
+
+	getCatalog(auth: InternalToolPrincipal, request: CatalogRequest) {
+		const body = JSON.stringify(CatalogRequestSchema.parse(request))
+		return this.request(
+			'POST',
+			'/v1/internal/mcp/catalog',
+			auth,
+			body,
+			z.object({
+				view: z.string(),
+				data: z.record(z.string(), z.unknown()),
+				generatedAt: z.string().datetime(),
+			}),
 		)
 	}
 }
