@@ -388,6 +388,66 @@ describe('config contracts', () => {
 		}
 	})
 
+	test('rejects variant weights that do not sum to 10000', () => {
+		expect(() =>
+			ManageExperimentsRequestSchema.parse({
+				action: 'replace_variant_weights',
+				organizationId,
+				idempotencyKey,
+				experimentId,
+				expectedVariants: [{ id: configId, weightBp: 10000 }],
+				variants: [
+					{ id: configId, weightBp: 3000 },
+					{ id: experimentId, weightBp: 3000 },
+				],
+			}),
+		).toThrow()
+		expect(
+			ManageExperimentsRequestSchema.parse({
+				action: 'replace_variant_weights',
+				organizationId,
+				idempotencyKey,
+				experimentId,
+				expectedVariants: [],
+				variants: [
+					{ id: configId, weightBp: 4000 },
+					{ id: experimentId, weightBp: 6000 },
+				],
+			}),
+		).toBeTruthy()
+	})
+
+	test('does not advertise a variant weight the API would reject', () => {
+		expect(() =>
+			ManageExperimentsRequestSchema.parse({
+				action: 'update_variant',
+				organizationId,
+				idempotencyKey,
+				experimentId,
+				variantId: configId,
+				weightBp: 5000,
+			}),
+		).toThrow()
+	})
+
+	test('rejects duplicate platform overrides', () => {
+		expect(() =>
+			ManageRemoteConfigRequestSchema.parse({
+				action: 'create_scope_set',
+				organizationId,
+				idempotencyKey,
+				projectId: configId,
+				key: 'k',
+				valueType: 'string',
+				defaultValue: 'a',
+				platformOverrides: [
+					{ platform: 'ios', defaultValue: 'a' },
+					{ platform: 'ios', defaultValue: 'b' },
+				],
+			}),
+		).toThrow()
+	})
+
 	test('bounds variant weights and traffic allocation in basis points', () => {
 		expect(() =>
 			ManageExperimentsRequestSchema.parse({

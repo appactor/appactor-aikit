@@ -114,6 +114,29 @@ const PlatformOverride = z
 	})
 	.strict()
 
+function uniquePlatforms(
+	items: Array<{ platform: string }>,
+	ctx: {
+		addIssue: (issue: {
+			code: 'custom'
+			message: string
+			path: (string | number)[]
+		}) => void
+	},
+) {
+	const seen = new Set<string>()
+	for (const [index, item] of items.entries()) {
+		if (seen.has(item.platform)) {
+			ctx.addIssue({
+				code: 'custom',
+				message: 'Platform overrides must be unique',
+				path: [index, 'platform'],
+			})
+		}
+		seen.add(item.platform)
+	}
+}
+
 export const ManageRemoteConfigRequestSchema = z.discriminatedUnion('action', [
 	z
 		.object({
@@ -143,6 +166,7 @@ export const ManageRemoteConfigRequestSchema = z.discriminatedUnion('action', [
 			platformOverrides: z
 				.array(PlatformOverride.omit({ id: true }))
 				.max(2)
+				.superRefine(uniquePlatforms)
 				.default([]),
 		})
 		.strict(),
@@ -178,7 +202,11 @@ export const ManageRemoteConfigRequestSchema = z.discriminatedUnion('action', [
 				)
 				.min(1)
 				.max(3),
-			platformOverrides: z.array(PlatformOverride).max(2).default([]),
+			platformOverrides: z
+				.array(PlatformOverride)
+				.max(2)
+				.superRefine(uniquePlatforms)
+				.default([]),
 		})
 		.strict(),
 	z
@@ -194,7 +222,7 @@ export const ManageRemoteConfigRequestSchema = z.discriminatedUnion('action', [
 						.object({
 							priority: z.number().int().min(0),
 							value: z.unknown(),
-							conditions: z.array(ConfigCondition).max(20),
+							conditions: z.array(ConfigCondition).max(10),
 							isActive: z.boolean().optional().default(true),
 						})
 						.strict(),
@@ -251,6 +279,24 @@ const VariantWeights = z
 	.describe(
 		'Weights are basis points and must sum to 10000 across the experiment.',
 	)
+
+/**
+ * Bucketing accumulates weights and falls through to the last variant when the
+ * total is short, so a set that does not sum to 10000 silently hands nearly all
+ * traffic to one arm rather than failing. Checked here as well as in the API so
+ * the model sees the error before the request leaves.
+ */
+const VariantWeightsSummingToFull = VariantWeights.min(1).superRefine(
+	(variants, ctx) => {
+		const total = variants.reduce((sum, variant) => sum + variant.weightBp, 0)
+		if (total !== 10000) {
+			ctx.addIssue({
+				code: 'custom',
+				message: `Variant weights must sum to 10000 basis points (got ${total}).`,
+			})
+		}
+	},
+)
 const CreateVariant = z
 	.object({
 		key: ExperimentKey,
@@ -281,7 +327,7 @@ export const ManageExperimentsRequestSchema = z.discriminatedUnion('action', [
 				.default(10000),
 			targetingConditions: z
 				.array(ConfigCondition)
-				.max(20)
+				.max(10)
 				.optional()
 				.default([]),
 			goals: z.array(Goal).max(10).optional().default([]),
@@ -297,7 +343,7 @@ export const ManageExperimentsRequestSchema = z.discriminatedUnion('action', [
 			name: z.string().max(200).nullish(),
 			description: z.string().max(2000).nullish(),
 			trafficAllocationBp: z.number().int().min(0).max(10000).optional(),
-			targetingConditions: z.array(ConfigCondition).max(20).optional(),
+			targetingConditions: z.array(ConfigCondition).max(10).optional(),
 			goals: z.array(Goal).max(10).optional(),
 		})
 		.strict(),
@@ -330,7 +376,8 @@ export const ManageExperimentsRequestSchema = z.discriminatedUnion('action', [
 			key: ExperimentKey.optional(),
 			name: z.string().max(200).nullish(),
 			isControl: z.boolean().optional(),
-			weightBp: z.number().int().min(0).max(10000).optional(),
+			// No weightBp: the API rejects any value that differs from the stored
+			// one. Weights change through replace_variant_weights.
 			valueType: ConfigValueType.optional(),
 			payload: z.unknown().optional(),
 		})
@@ -342,7 +389,7 @@ export const ManageExperimentsRequestSchema = z.discriminatedUnion('action', [
 			idempotencyKey: IdempotencyKey,
 			experimentId: ResourceId,
 			expectedVariants: VariantWeights,
-			variants: VariantWeights.min(1),
+			variants: VariantWeightsSummingToFull,
 		})
 		.strict(),
 ])
