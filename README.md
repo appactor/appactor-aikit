@@ -54,6 +54,12 @@ Available read-only tools are:
   `analytics:read` plus the matching AppActor dashboard permission.
 - `get_catalog`: read catalog context, products, entitlements, offerings, and
   packages. Requires `catalog:read` plus project-level `catalog.read`.
+- `get_subscriber`: look up one subscriber by their exact app user ID and read
+  their entitlements, subscription status, and recent purchases. Requires
+  `subscribers:read` plus project-level `subscribers.read`. Matching is exact,
+  so the tool cannot browse or enumerate a customer base, and custom
+  attributes, email, phone, push tokens, integration identifiers, and token
+  ledgers are never returned.
 
 Controlled write tools are:
 
@@ -72,8 +78,8 @@ request is rejected. Deletion, detach, direct-current, credential, and webhook
 secret operations are intentionally unavailable.
 
 OAuth asks for `workspace:read`, `analytics:read`, `catalog:read`,
-`catalog:write`, and `workspace:write`. Existing AppActor organization and
-project permissions still apply to every tool call.
+`catalog:write`, `workspace:write`, and `subscribers:read`. Existing AppActor
+organization and project permissions still apply to every tool call.
 
 ## Deployment
 

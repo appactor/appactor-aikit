@@ -126,6 +126,7 @@ describe('MCP controlled write tools', () => {
 			'get_app_setup',
 			'query_analytics',
 			'get_catalog',
+			'get_subscriber',
 			...toolCases.map((tool) => tool.name),
 		])
 		const expectedAnnotations = {
