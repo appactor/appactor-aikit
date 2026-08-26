@@ -80,9 +80,10 @@ export async function createApp(config: Config, fetcher: typeof fetch = fetch) {
 		registers: [registry],
 	})
 	const resource = new URL(config.MCP_RESOURCE_URL)
-	const mcpHandler = createMcpHandler(
-		(context) => createAppActorMcpServer(api, context.authInfo),
-		{ legacy: 'reject' },
+	// Default `legacy: 'stateless'` keeps 2025-era clients (current Claude and
+	// Codex releases) working alongside the 2026-07-28 per-request protocol.
+	const mcpHandler = createMcpHandler((context) =>
+		createAppActorMcpServer(api, context.authInfo),
 	)
 	const createProtectedHandler = (requiredScope: string) =>
 		createMcpProtectedRequestHandler(
@@ -135,8 +136,28 @@ export async function createApp(config: Config, fetcher: typeof fetch = fetch) {
 			return c.json({ error: 'Invalid host or origin.' }, 403)
 		}
 		const scope = requiredScopeForRequest(c.req.raw)
-		const response = await protectedHandlers.get(scope)?.(c.req.raw)
-		if (!response) return c.json({ error: 'Unsupported MCP scope.' }, 500)
+		const handler = protectedHandlers.get(scope)
+		if (!handler) return c.json({ error: 'Unsupported MCP scope.' }, 500)
+		let response: Response
+		try {
+			response = await handler(c.req.raw)
+		} catch (error) {
+			// Token verification infrastructure failures (JWKS unreachable, upstream
+			// 5xx) are not client errors; surface them as a retryable 503.
+			console.error(
+				JSON.stringify({
+					level: 'error',
+					message: 'MCP token verification unavailable',
+					error: error instanceof Error ? error.message : String(error),
+				}),
+			)
+			requests.inc({ route: 'mcp', status: '503' })
+			return c.json(
+				{ error: 'Authorization server is temporarily unavailable.' },
+				503,
+				{ 'retry-after': '5' },
+			)
+		}
 		requests.inc({ route: 'mcp', status: String(response.status) })
 		return response
 	})

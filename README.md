@@ -78,10 +78,19 @@ project permissions still apply to every tool call.
 ## Deployment
 
 Use a P-256 private key in this service and the matching public key in the
-AppActor API. `MCP_AUTH_ISSUER` must exactly match the API's `BETTER_AUTH_URL`,
-including any `/api/auth` path. Deployment and migration order are documented
-in the API repository at `docs/runbooks/mcp-delivery-1-rollout.md`.
-Delivery 3 write rollout is documented at
-`docs/runbooks/mcp-delivery-3-rollout.md` in the API repository.
-The default AppActor API deadline is 35 seconds so store discovery and setup
-calls can complete within the API's 30-second request budget.
+AppActor API. `MCP_AUTH_ISSUER` must equal the `iss` claim Better Auth puts in
+OAuth access tokens, which is the Auth service's `BETTER_AUTH_URL` **plus its
+`/api/auth` base path** (production: `https://auth.appactor.com/api/auth`).
+`MCP_AUTH_JWKS_URL` is that issuer plus `/jwks`. Deployment and migration order
+are documented in the API repository at
+`docs/runbooks/mcp-delivery-1-rollout.md`. Delivery 3 write rollout is
+documented at `docs/runbooks/mcp-delivery-3-rollout.md` in the API repository.
+The default AppActor API deadline is 35 seconds, deliberately longer than the
+API's own 30-second request timeout, so a slow store discovery surfaces the
+API's structured 504 instead of an opaque client-side abort.
+
+The server accepts both the 2026-07-28 per-request MCP protocol and the
+2025-era Streamable HTTP protocol (stateless fallback), so current Claude and
+Codex releases connect without a client upgrade.
+
+A `Dockerfile` is included; the container listens on `PORT` (default 3000).

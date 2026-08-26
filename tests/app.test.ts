@@ -2,6 +2,7 @@ import { afterEach, describe, expect, test } from 'bun:test'
 import { SignJWT, jwtVerify } from 'jose'
 import { createApp } from '../src/app'
 import {
+	issueAccessToken,
 	modernMeta,
 	stopTestServers,
 	createMcpAppFixture as testConfig,
@@ -323,4 +324,85 @@ describe('MCP HTTP app', () => {
 			target: `/v1/internal/mcp/workspace?appLimit=100&organizationId=${organizationId}`,
 		})
 	})
+
+	test('serves 2025-era (legacy) clients through the stateless fallback', async () => {
+		const fixture = await testConfig()
+		const accessToken = await issueAccessToken(fixture, 'workspace:read')
+		const legacyRpc = (id: number, method: string, params: unknown) =>
+			fixture.app.request('https://mcp.example.com/mcp', {
+				method: 'POST',
+				headers: {
+					authorization: `Bearer ${accessToken}`,
+					'content-type': 'application/json',
+					accept: 'application/json, text/event-stream',
+				},
+				body: JSON.stringify({ jsonrpc: '2.0', id, method, params }),
+			})
+
+		const initialize = await legacyRpc(1, 'initialize', {
+			protocolVersion: '2025-06-18',
+			capabilities: {},
+			clientInfo: { name: 'legacy-client', version: '1.0.0' },
+		})
+		expect(initialize.status).toBe(200)
+		const initializeBody = await readJsonRpcBody(initialize)
+		expect(initializeBody.result?.protocolVersion).toBe('2025-06-18')
+		expect(initializeBody.result?.serverInfo?.name).toBe('appactor-mcp')
+
+		const list = await legacyRpc(2, 'tools/list', {})
+		expect(list.status).toBe(200)
+		const listBody = await readJsonRpcBody(list)
+		expect(
+			(listBody.result?.tools as Array<{ name: string }>).map((t) => t.name),
+		).toHaveLength(10)
+	})
+
+	test('returns 503 instead of 500 when the JWKS endpoint is unreachable', async () => {
+		const fixture = await testConfig()
+		const app = await createApp({
+			...fixture.config,
+			MCP_AUTH_JWKS_URL: 'http://127.0.0.1:1/jwks',
+		})
+		const accessToken = await issueAccessToken(fixture, 'workspace:read')
+		const response = await app.request('https://mcp.example.com/mcp', {
+			method: 'POST',
+			headers: {
+				authorization: `Bearer ${accessToken}`,
+				'content-type': 'application/json',
+				'mcp-method': 'tools/list',
+				'mcp-protocol-version': '2026-07-28',
+			},
+			body: JSON.stringify({
+				jsonrpc: '2.0',
+				id: 1,
+				method: 'tools/list',
+				params: { _meta: modernMeta() },
+			}),
+		})
+		expect(response.status).toBe(503)
+		expect(response.headers.get('retry-after')).toBe('5')
+		expect(await response.json()).toEqual({
+			error: 'Authorization server is temporarily unavailable.',
+		})
+	})
 })
+
+async function readJsonRpcBody(response: Response): Promise<{
+	result?: Record<string, unknown> & {
+		protocolVersion?: string
+		serverInfo?: { name?: string }
+		tools?: unknown
+	}
+}> {
+	const text = await response.text()
+	if (response.headers.get('content-type')?.includes('text/event-stream')) {
+		const data = text
+			.split('\n')
+			.filter((line) => line.startsWith('data:'))
+			.map((line) => line.slice(5).trim())
+			.find((line) => line.includes('"result"'))
+		if (!data) throw new Error(`No JSON-RPC result in SSE body: ${text}`)
+		return JSON.parse(data)
+	}
+	return JSON.parse(text)
+}
