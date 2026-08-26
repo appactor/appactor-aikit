@@ -75,8 +75,7 @@ So a plain timeout is **not** something to retry your way out of. If the server
 recorded the operation as uncertain, retrying the same key returns a conflict and
 a new key risks a duplicate write. Stop, report the conflict message to the user,
 and check the resource's real state with the matching read tool before doing
-anything else. `get_audit_log` shows the ledger entry, including whether it ended
-`pending` or `uncertain`.
+anything else.
 
 ## Publishing an offering: preview, then apply
 
