@@ -114,7 +114,7 @@ describe('MCP HTTP app', () => {
 			resource: config.MCP_RESOURCE_URL,
 			authorization_servers: [config.MCP_AUTH_ISSUER],
 			bearer_methods_supported: ['header'],
-			scopes_supported: ['workspace:read'],
+			scopes_supported: ['workspace:read', 'analytics:read', 'catalog:read'],
 		})
 		expect(
 			(

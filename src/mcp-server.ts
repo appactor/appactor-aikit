@@ -1,7 +1,13 @@
 import { type AuthInfo, McpServer } from '@modelcontextprotocol/server'
 import { z } from 'zod'
 import { type AppActorApiClient, AppActorApiError } from './appactor-api'
-import { AppSetupSchema, type Workspace, WorkspaceSchema } from './contracts'
+import {
+	AnalyticsRequestSchema,
+	AppSetupSchema,
+	CatalogRequestSchema,
+	type Workspace,
+	WorkspaceSchema,
+} from './contracts'
 
 function scopesFrom(authInfo: AuthInfo) {
 	return [...new Set(authInfo.scopes)]
@@ -123,6 +129,78 @@ export function createAppActorMcpServer(
 				return successResult(
 					data,
 					`${data.app.name} (${data.app.platform}) setup and connection status.`,
+				)
+			} catch (error) {
+				return errorResult(error)
+			}
+		},
+	)
+
+	server.registerTool(
+		'query_analytics',
+		{
+			title: 'Query AppActor Analytics',
+			description:
+				'Read AppActor dashboard analytics for an accessible organization, project, or app. This tool is read-only.',
+			inputSchema: AnalyticsRequestSchema,
+			outputSchema: z.object({
+				kind: z.string(),
+				data: z.record(z.string(), z.unknown()),
+				generatedAt: z.string().datetime(),
+			}),
+			annotations: {
+				readOnlyHint: true,
+				destructiveHint: false,
+				idempotentHint: true,
+				openWorldHint: false,
+			},
+		},
+		async (request) => {
+			try {
+				const principal = requirePrincipal(authInfo, 'analytics:read')
+				const result = await api.queryAnalytics(
+					{ ...principal, tool: 'query_analytics' },
+					request,
+				)
+				return successResult(
+					result,
+					`${request.kind} analytics result for the requested scope.`,
+				)
+			} catch (error) {
+				return errorResult(error)
+			}
+		},
+	)
+
+	server.registerTool(
+		'get_catalog',
+		{
+			title: 'Read AppActor Catalog',
+			description:
+				'Read products, entitlements, offerings, packages, and store setup for an accessible AppActor project. This tool is read-only.',
+			inputSchema: CatalogRequestSchema,
+			outputSchema: z.object({
+				view: z.string(),
+				data: z.record(z.string(), z.unknown()),
+				generatedAt: z.string().datetime(),
+			}),
+			annotations: {
+				readOnlyHint: true,
+				destructiveHint: false,
+				idempotentHint: true,
+				openWorldHint: false,
+			},
+		},
+		async (request) => {
+			try {
+				const principal = requirePrincipal(authInfo, 'catalog:read')
+				const result = await api.getCatalog(
+					{ ...principal, tool: 'get_catalog' },
+					request,
+				)
+				return successResult(
+					result,
+					`${request.view} catalog view for project ${request.projectId}.`,
 				)
 			} catch (error) {
 				return errorResult(error)
