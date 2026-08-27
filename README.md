@@ -13,7 +13,7 @@ Ask it to add subscriptions to your Flutter app and it already knows the API.
 
 ```bash
 claude plugin marketplace add appactor/appactor-aikit
-claude plugin install appactor
+claude plugin install appactor@appactor
 ```
 
 **Codex CLI**
@@ -58,6 +58,21 @@ packages, projects, apps, remote config, and experiments.
 The SDK skills are written from the SDK sources, so signatures, enum cases,
 error codes, and ordering constraints match the code rather than a summary of
 it.
+
+## Rate limits
+
+Limits are per connection — your AppActor user plus the OAuth client you
+approved — so one runaway agent cannot starve your other clients:
+
+| | Per minute |
+| --- | --- |
+| Reads | 120 |
+| Writes | 30 |
+
+Exceeding a limit returns `429` with standard `Retry-After` and
+`X-RateLimit-*` headers. The tools translate that into a plain instruction to
+wait, and never suggest replaying a write's idempotency key for a `429` —
+nothing was written.
 
 ## Access
 
