@@ -2,6 +2,8 @@ import { describe, expect, test } from 'bun:test'
 import {
 	CreateAppResponseSchema,
 	CreateProjectResponseSchema,
+	DeleteAppResponseSchema,
+	DeleteProjectResponseSchema,
 	ManageEntitlementsResponseSchema,
 	ManageOfferingsResponseSchema,
 	ManagePackagesResponseSchema,
@@ -9,6 +11,8 @@ import {
 } from '../src/contracts/write-responses'
 import {
 	app,
+	deleteImpact,
+	deletePreview,
 	entitlement,
 	ids,
 	offering,
@@ -100,6 +104,46 @@ describe('MCP controlled write responses', () => {
 				CreateAppResponseSchema,
 				succeeded('create', { app, publicApiKey: 'pk_public' }, true),
 			],
+			[
+				CreateAppResponseSchema,
+				succeeded('create', {
+					app,
+					publicApiKey: 'pk_public',
+					appleCredentialNotice: {
+						code: 'apple_credential_selection_required',
+						message: 'Several Apple credentials exist.',
+						url: 'https://dashboard.example.com/settings?tab=credentials',
+					},
+				}),
+			],
+			[DeleteProjectResponseSchema, deletePreview('project', 'New Project')],
+			[DeleteAppResponseSchema, deletePreview('app', 'Example App')],
+			[
+				DeleteProjectResponseSchema,
+				succeeded('apply', {
+					deleted: true,
+					alreadyAbsent: false,
+					target: 'project',
+					targetId: ids.project,
+					name: 'New Project',
+					impact: deleteImpact,
+				}),
+			],
+			[
+				DeleteAppResponseSchema,
+				succeeded(
+					'apply',
+					{
+						deleted: true,
+						alreadyAbsent: true,
+						target: 'app',
+						targetId: ids.resource,
+						name: 'Example App',
+						impact: null,
+					},
+					true,
+				),
+			],
 		] as const
 
 		for (const [schema, response] of responses) {
@@ -109,6 +153,36 @@ describe('MCP controlled write responses', () => {
 
 	test('fails closed on secret-bearing or unexpected upstream fields', () => {
 		const unsafeResponses = [
+			[
+				// A delete response that claims the wrong target would let a project preview be
+				// presented to the user as an app deletion.
+				DeleteAppResponseSchema,
+				deletePreview('project', 'New Project'),
+			],
+			[
+				DeleteProjectResponseSchema,
+				succeeded('apply', {
+					deleted: true,
+					alreadyAbsent: false,
+					target: 'project',
+					targetId: ids.project,
+					name: 'New Project',
+					impact: deleteImpact,
+					previewToken: 'must-not-leak',
+				}),
+			],
+			[
+				// `deleted: false` has no meaning here: apply either deleted or found it already gone.
+				DeleteProjectResponseSchema,
+				succeeded('apply', {
+					deleted: false,
+					alreadyAbsent: false,
+					target: 'project',
+					targetId: ids.project,
+					name: 'New Project',
+					impact: deleteImpact,
+				}),
+			],
 			[
 				CreateAppResponseSchema,
 				succeeded('create', {

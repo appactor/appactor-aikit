@@ -211,6 +211,20 @@ const CreateAppSuccessSchema = successfulOperation(
 			app: AppSchema,
 			publicApiKey: z.string().min(1),
 			appleConnectionWarning: z.string().optional(),
+			// Present when the app was created with no Apple credential bound: nothing failed, but
+			// product sync and reconciliation stay off until somebody binds one in the dashboard.
+			appleCredentialNotice: z
+				.object({
+					code: z.enum([
+						'apple_credential_required',
+						'apple_credential_selection_required',
+						'apple_credential_unknown',
+					]),
+					message: z.string(),
+					url: z.url(),
+				})
+				.strict()
+				.optional(),
 		})
 		.strict(),
 )
@@ -228,4 +242,65 @@ export const CreateAppResponseSchema = z.union([
 		})
 		.strict(),
 	CreateAppSuccessSchema,
+])
+
+const BoundedCountSchema = z
+	.object({
+		count: z.number().int().min(0),
+		// True when the real number is larger than `count`: the preview probes with a bounded scan
+		// instead of counting every row of a table that can hold millions.
+		atLeast: z.boolean(),
+	})
+	.strict()
+
+const DeleteImpactSchema = z
+	.object({
+		apps: z.number().int().min(0),
+		appNames: z.array(z.string()),
+		products: z.number().int().min(0),
+		entitlements: z.number().int().min(0),
+		offerings: z.number().int().min(0),
+		packages: z.number().int().min(0),
+		subscribers: BoundedCountSchema,
+		transactions: BoundedCountSchema,
+	})
+	.strict()
+
+function deletePreview(target: 'project' | 'app') {
+	return z
+		.object({
+			status: z.literal('preview'),
+			target: z.literal(target),
+			targetId: Id,
+			name: z.string(),
+			confirmName: z.string(),
+			impact: DeleteImpactSchema,
+			previewToken: z.string(),
+			expiresAt: DateTime,
+		})
+		.strict()
+}
+
+function deleteOutcome(target: 'project' | 'app') {
+	return z
+		.object({
+			deleted: z.literal(true),
+			// True when the target was already gone: the delete was a no-op, not a failure.
+			alreadyAbsent: z.boolean(),
+			target: z.literal(target),
+			targetId: Id,
+			name: z.string(),
+			impact: DeleteImpactSchema.nullable(),
+		})
+		.strict()
+}
+
+export const DeleteProjectResponseSchema = z.union([
+	deletePreview('project'),
+	successfulOperation('apply', deleteOutcome('project')),
+])
+
+export const DeleteAppResponseSchema = z.union([
+	deletePreview('app'),
+	successfulOperation('apply', deleteOutcome('app')),
 ])

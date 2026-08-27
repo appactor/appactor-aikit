@@ -8,6 +8,8 @@ import {
 } from './helpers/mcp-app-fixture'
 import {
 	app,
+	deleteImpact,
+	deletePreview,
 	entitlement,
 	ids,
 	offering,
@@ -169,6 +171,80 @@ const scenarios = [
 		},
 		response: succeeded('create', { app, publicApiKey: 'pk_public' }, true),
 	},
+	{
+		name: 'create_app',
+		path: '/v1/internal/mcp/apps',
+		arguments: {
+			organizationId: ids.organization,
+			idempotencyKey: 'create-ios-app-2',
+			projectId: ids.project,
+			name: 'Unbound App',
+			platform: 'ios',
+			bundleId: 'com.example.unbound',
+		},
+		response: succeeded('create', {
+			app,
+			publicApiKey: 'pk_public',
+			appleCredentialNotice: {
+				code: 'apple_credential_required',
+				message: 'No Apple credential is connected.',
+				url: 'https://dashboard.example.com/settings?tab=credentials',
+			},
+		}),
+	},
+	{
+		name: 'delete_project',
+		path: '/v1/internal/mcp/projects/delete',
+		arguments: {
+			action: 'preview',
+			organizationId: ids.organization,
+			projectId: ids.project,
+		},
+		response: deletePreview('project', 'New Project'),
+	},
+	{
+		name: 'delete_project',
+		path: '/v1/internal/mcp/projects/delete',
+		arguments: {
+			action: 'apply',
+			organizationId: ids.organization,
+			idempotencyKey: 'delete-project-1',
+			previewToken: 'p'.repeat(48),
+			confirmName: 'New Project',
+		},
+		response: succeeded('apply', {
+			deleted: true,
+			alreadyAbsent: false,
+			target: 'project',
+			targetId: ids.project,
+			name: 'New Project',
+			impact: deleteImpact,
+		}),
+	},
+	{
+		name: 'delete_app',
+		path: '/v1/internal/mcp/apps/delete',
+		arguments: {
+			action: 'apply',
+			organizationId: ids.organization,
+			idempotencyKey: 'delete-app-1',
+			previewToken: 'p'.repeat(48),
+			confirmName: 'Example App',
+		},
+		// The retry-after-an-interrupted-delete shape: succeeded, nothing destroyed, no impact to report.
+		response: succeeded(
+			'apply',
+			{
+				deleted: true,
+				alreadyAbsent: true,
+				target: 'app',
+				targetId: ids.resource,
+				name: 'Example App',
+				impact: null,
+			},
+			true,
+		),
+	},
 ] as const
 
 describe('MCP write action protocol coverage', () => {
@@ -185,7 +261,7 @@ describe('MCP write action protocol coverage', () => {
 		})
 		const token = await issueAccessToken(
 			fixture,
-			'catalog:write workspace:write',
+			'catalog:write workspace:write workspace:delete',
 		)
 
 		for (const scenario of scenarios) {

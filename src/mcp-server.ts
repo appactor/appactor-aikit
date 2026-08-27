@@ -20,7 +20,7 @@ import { registerSubscriberReadTools } from './tools/subscriber-reads'
 import { registerWorkspaceWriteTools } from './tools/workspace-writes'
 
 const SERVER_INSTRUCTIONS =
-	'For every logical write, generate one idempotencyKey. If a timeout or uncertain result occurs, retry the exact same arguments with that same key; never generate a new key for the retry. Show an offering publication preview to the user and obtain approval before apply_publish. Never request store credential JSON.'
+	'For every logical write, generate one idempotencyKey. If a timeout or uncertain result occurs, retry the exact same arguments with that same key; never generate a new key for the retry. Show an offering publication preview to the user and obtain approval before apply_publish. Deleting a project or an app is permanent: show the preview, and send apply only after the user has typed the name back themselves — never supply confirmName on their behalf. Never request store credential JSON.'
 
 function workspaceSummary(data: Workspace) {
 	const more = data.appsPagination?.hasMore ? ' More apps are available.' : ''

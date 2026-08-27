@@ -86,3 +86,27 @@ export function succeeded<
 		result,
 	}
 }
+
+export const deleteImpact = {
+	apps: 1,
+	appNames: ['Example App'],
+	products: 2,
+	entitlements: 1,
+	offerings: 1,
+	packages: 3,
+	subscribers: { count: 12, atLeast: false },
+	transactions: { count: 10_000, atLeast: true },
+}
+
+export function deletePreview(target: 'project' | 'app', name: string) {
+	return {
+		status: 'preview' as const,
+		target,
+		targetId: target === 'project' ? ids.project : ids.resource,
+		name,
+		confirmName: name,
+		impact: deleteImpact,
+		previewToken: 'p'.repeat(48),
+		expiresAt: timestamp,
+	}
+}

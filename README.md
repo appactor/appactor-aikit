@@ -92,9 +92,15 @@ Every mutation is recorded with the actor, the client, the tool, and the
 resources it touched, and is replay-safe: retrying an interrupted write with the
 same idempotency key returns the stored result instead of duplicating it.
 
-Deletion, entitlement detach, credential upload or reveal, key rotation, and
-webhook secret management are intentionally unavailable to AI clients and stay
-in the dashboard.
+Deleting a project or an app is available, and only through a two-step preview:
+the first call reports exactly what would be destroyed, the second needs that
+preview's token plus the name typed back by you. It is a separate
+`workspace:delete` scope, so a connection approved before it existed does not
+acquire it silently.
+
+Catalog deletion, entitlement detach, credential upload, reveal or binding, key
+rotation, and webhook secret management are intentionally unavailable to AI
+clients and stay in the dashboard.
 
 ## Repository layout
 
