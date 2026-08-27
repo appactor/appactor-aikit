@@ -101,7 +101,12 @@ final cached = await AppActor.instance.getCachedOfferings();
 
 ## Purchase
 
+`packageFor` returns null when the offering does not carry that package type, and
+`purchasePackage` takes a non-null package — so check before you call it.
+
 ```dart
+if (monthly == null) return;   // nothing to sell on this paywall
+
 final result = await AppActor.instance.purchasePackage(
   monthly,
   placement: 'onboarding_paywall',   // optional analytics label

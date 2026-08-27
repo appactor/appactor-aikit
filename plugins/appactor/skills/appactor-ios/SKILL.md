@@ -97,8 +97,13 @@ try await AppActor.shared.setFallbackOfferings(from: bundledJSONURL)
 
 ## Purchase
 
+`offering?.annual` is optional and `purchase(package:)` takes a non-optional
+package, so unwrap it before you buy.
+
 ```swift
-switch try await AppActor.shared.purchase(package: annual) {
+guard let annualPackage = annual else { return }   // nothing to sell on this paywall
+
+switch try await AppActor.shared.purchase(package: annualPackage) {
 case .success(let customerInfo, _):
     unlock(if: customerInfo.hasActiveEntitlement("premium"))
 case .cancelled:
@@ -165,7 +170,7 @@ Everything throws `AppActorError`, a struct with `kind`, `httpStatus`, `code`,
 
 ```swift
 do {
-    _ = try await AppActor.shared.purchase(package: annual)
+    _ = try await AppActor.shared.purchase(package: annualPackage)
 } catch let error as AppActorError {
     switch error.kind {
     case .receiptQueuedForRetry:

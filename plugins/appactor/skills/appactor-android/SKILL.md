@@ -99,12 +99,15 @@ synced values with no suspension.
 ## Purchase
 
 A purchase needs the **Activity**, not the application context — Play Billing
-launches its sheet from it:
+launches its sheet from it. `packageFor` returns null when the offering has no
+package of that type, and `purchase` takes a non-null one:
 
 ```kotlin
+val annualPackage = annual ?: return   // nothing to sell on this paywall
+
 val result = AppActor.purchase(
     activity = this,
-    appActorPackage = annual,
+    appActorPackage = annualPackage,
     placement = "onboarding_paywall",   // optional analytics label
 )
 ```
@@ -154,7 +157,7 @@ the subclass:
 
 ```kotlin
 try {
-    AppActor.purchase(activity, annual)
+    AppActor.purchase(activity, annualPackage)
 } catch (error: AppActorError) {
     when (error) {
         is AppActorError.ReceiptQueuedForRetry -> showProcessing()

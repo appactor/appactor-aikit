@@ -82,7 +82,12 @@ Render prices from the package (`localizedPriceString`, `price`,
 
 ## Purchase
 
+`offering?.annual` is `AppActorPackage | undefined` and `purchasePackage` takes a
+defined package, so narrow it before you call.
+
 ```ts
+if (!annual) return;   // nothing to sell on this paywall
+
 const result = await AppActor.instance.purchasePackage(annual, {
   placement: 'onboarding_paywall',
 });

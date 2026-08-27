@@ -7,6 +7,12 @@ Thanks for helping improve the AppActor AI Toolkit.
 ```bash
 bun install
 cp .env.example .env
+
+# The server refuses to start without a signing key, and .env.example ships an
+# empty one. Generate it into the file:
+openssl ecparam -genkey -name prime256v1 | openssl pkcs8 -topk8 -nocrypt \
+  | awk 'BEGIN{printf "MCP_INTERNAL_JWT_PRIVATE_KEY=\""} {printf "%s\\n", $0} END{print "\""}' >> .env
+
 bun run dev
 ```
 
