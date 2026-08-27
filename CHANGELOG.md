@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.2.0
 
 - `delete_project` and `delete_app`: the first deletes on the MCP surface, behind
   a two-step preview → apply flow. The preview reports what would be destroyed —
