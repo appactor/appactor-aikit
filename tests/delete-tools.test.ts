@@ -9,6 +9,7 @@ import {
 } from './helpers/mcp-app-fixture'
 import {
 	appDeleteImpact,
+	deleteOutcome,
 	deletePreview,
 	ids,
 	projectDeleteImpact,
@@ -146,20 +147,15 @@ describe('MCP delete tools', () => {
 		expect(text).toContain('2 entitlement binding(s)')
 		expect(text).not.toContain('offering(s)')
 		expect(text).not.toContain('0 package(s)')
+		// The sentence already opens by naming the app; repeating it as an "Apps:" clause says nothing.
+		expect(text).not.toContain('Apps:')
 		expect(body.result?.structuredContent?.impact).toEqual(appDeleteImpact)
 	})
 
 	test('reports an already-deleted target as done rather than as an error', async () => {
 		const fixture = await createMcpAppFixture(async () =>
 			Response.json({
-				data: succeeded('apply', {
-					deleted: true,
-					alreadyAbsent: true,
-					target: 'app',
-					targetId: ids.resource,
-					name: 'AnimalSound iOS',
-					impact: null,
-				}),
+				data: deleteOutcome('app', 'AnimalSound iOS', { alreadyAbsent: true }),
 				requestId: 'request-absent',
 			}),
 		)
@@ -196,14 +192,7 @@ describe('MCP delete tools', () => {
 		const fixture = await createMcpAppFixture(async (request) => {
 			bodies.push((await request.json()) as Record<string, unknown>)
 			return Response.json({
-				data: succeeded('apply', {
-					deleted: true,
-					alreadyAbsent: false,
-					target: 'project',
-					targetId: ids.project,
-					name: 'AnimalSound',
-					impact: projectDeleteImpact,
-				}),
+				data: deleteOutcome('project', 'AnimalSound'),
 				requestId: 'request-apply',
 			})
 		})

@@ -8,6 +8,7 @@ import {
 } from './helpers/mcp-app-fixture'
 import {
 	app,
+	deleteOutcome,
 	deletePreview,
 	entitlement,
 	ids,
@@ -209,14 +210,7 @@ const scenarios = [
 			previewToken: 'p'.repeat(48),
 			confirmName: 'New Project',
 		},
-		response: succeeded('apply', {
-			deleted: true,
-			alreadyAbsent: false,
-			target: 'project',
-			targetId: ids.project,
-			name: 'New Project',
-			impact: projectDeleteImpact,
-		}),
+		response: deleteOutcome('project', 'New Project'),
 	},
 	{
 		name: 'delete_app',
@@ -229,18 +223,10 @@ const scenarios = [
 			confirmName: 'Example App',
 		},
 		// The retry-after-an-interrupted-delete shape: succeeded, nothing destroyed, no impact to report.
-		response: succeeded(
-			'apply',
-			{
-				deleted: true,
-				alreadyAbsent: true,
-				target: 'app',
-				targetId: ids.resource,
-				name: 'Example App',
-				impact: null,
-			},
-			true,
-		),
+		response: deleteOutcome('app', 'Example App', {
+			alreadyAbsent: true,
+			replayed: true,
+		}),
 	},
 ] as const
 

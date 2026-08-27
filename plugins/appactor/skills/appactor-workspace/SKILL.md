@@ -116,8 +116,9 @@ iOS never blocks on that, because an iOS app works without a store credential â€
 StoreKit receipts verify against Apple's root CAs, so purchases and the paywall
 do not depend on one. If the organization has exactly one Apple credential the
 app is bound to it automatically. Otherwise the app is still created and the
-result carries `appleCredentialNotice` with a dashboard URL. Relay it: until a
-credential is bound, product sync, restore history and subscription
+result carries `appleConnectionWarning` â€” the same field that reports a failed
+credential probe, because both mean the same thing to the operator. Relay it:
+until a credential is bound, product sync, restore history and subscription
 reconciliation stay off, and the catalog page shows "Apple credentials not
 configured".
 

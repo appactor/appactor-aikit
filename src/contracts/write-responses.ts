@@ -2,6 +2,7 @@ import { z } from 'zod'
 
 const Id = z.uuid()
 const DateTime = z.string().datetime()
+const Count = z.number().int().min(0)
 
 const ProductSchema = z
 	.object({
@@ -47,9 +48,9 @@ const PackageSchema = z
 		offeringId: Id,
 		packageType: z.string(),
 		displayName: z.string(),
-		position: z.number().int().min(0),
+		position: Count,
 		isActive: z.boolean(),
-		tokenAmount: z.number().int().min(0).nullable(),
+		tokenAmount: Count.nullable(),
 		createdAt: DateTime,
 		updatedAt: DateTime,
 	})
@@ -121,8 +122,8 @@ export const ManageProductsResponseSchema = z.union([
 		'import',
 		z
 			.object({
-				imported: z.number().int().min(0),
-				total: z.number().int().min(0),
+				imported: Count,
+				total: Count,
 				products: z.array(ProductSchema),
 			})
 			.strict(),
@@ -158,8 +159,8 @@ export const ManageOfferingsResponseSchema = z.union([
 				.object({
 					currentOfferingId: Id.nullable(),
 					nextOfferingId: Id,
-					packageCount: z.number().int().min(0),
-					packageProductCount: z.number().int().min(0),
+					packageCount: Count,
+					packageProductCount: Count,
 				})
 				.strict(),
 		})
@@ -190,7 +191,7 @@ export const ManagePackagesResponseSchema = z.union([
 						packageId: Id,
 						productId: Id,
 						googleOfferId: z.string().nullable(),
-						position: z.number().int().min(0),
+						position: Count,
 						createdAt: DateTime,
 					})
 					.strict(),
@@ -235,14 +236,12 @@ export const CreateAppResponseSchema = z.union([
 
 const BoundedCountSchema = z
 	.object({
-		count: z.number().int().min(0),
+		count: Count,
 		// True when the real number is larger than `count`: the preview probes with a bounded scan
 		// instead of counting every row of a table that can hold millions.
 		atLeast: z.boolean(),
 	})
 	.strict()
-
-const Count = z.number().int().min(0)
 
 const DeleteImpactSchema = z
 	.object({
@@ -312,6 +311,11 @@ export const DeleteAppResponseSchema = z.union([
 	successfulOperation('apply', deleteOutcome('app')),
 ])
 
+export type CreateProjectResponse = z.infer<typeof CreateProjectResponseSchema>
+export type CreateAppResponse = z.infer<typeof CreateAppResponseSchema>
+export type DeleteImpact = z.infer<typeof DeleteImpactSchema>
+export type DeleteProjectResponse = z.infer<typeof DeleteProjectResponseSchema>
+export type DeleteAppResponse = z.infer<typeof DeleteAppResponseSchema>
 export type DeleteResponse =
 	| z.infer<typeof DeleteProjectResponseSchema>
 	| z.infer<typeof DeleteAppResponseSchema>

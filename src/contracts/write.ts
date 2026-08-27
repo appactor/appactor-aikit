@@ -11,6 +11,11 @@ const IdempotencyKey = z
 		'Generate once per logical operation. After a timeout or uncertain result, retry the exact same arguments with this same key; never generate a new key for that retry.',
 	)
 const OptionalDisplayName = z.string().max(255).nullable().optional()
+const PreviewToken = z
+	.string()
+	.min(32)
+	.max(4096)
+	.describe('The previewToken returned by the matching preview action.')
 const PackageType = z.enum([
 	'lifetime',
 	'annual',
@@ -127,7 +132,7 @@ export const ManageOfferingsRequestSchema = z.discriminatedUnion('action', [
 			action: z.literal('apply_publish'),
 			organizationId: OrganizationId,
 			idempotencyKey: IdempotencyKey,
-			previewToken: z.string().min(32).max(4096),
+			previewToken: PreviewToken,
 		})
 		.strict(),
 ])
@@ -218,11 +223,6 @@ const DeleteConfirmName = z
 	.describe(
 		"The name of the project or app exactly as the preview reported it, typed back by the user. Never invent this value or copy it from the preview on the user's behalf.",
 	)
-const DeletePreviewToken = z
-	.string()
-	.min(32)
-	.max(4096)
-	.describe('The previewToken returned by the matching preview action.')
 
 export const DeleteProjectRequestSchema = z.discriminatedUnion('action', [
 	z
@@ -237,7 +237,7 @@ export const DeleteProjectRequestSchema = z.discriminatedUnion('action', [
 			action: z.literal('apply'),
 			organizationId: OrganizationId,
 			idempotencyKey: IdempotencyKey,
-			previewToken: DeletePreviewToken,
+			previewToken: PreviewToken,
 			confirmName: DeleteConfirmName,
 		})
 		.strict(),
@@ -256,7 +256,7 @@ export const DeleteAppRequestSchema = z.discriminatedUnion('action', [
 			action: z.literal('apply'),
 			organizationId: OrganizationId,
 			idempotencyKey: IdempotencyKey,
-			previewToken: DeletePreviewToken,
+			previewToken: PreviewToken,
 			confirmName: DeleteConfirmName,
 		})
 		.strict(),

@@ -7,11 +7,15 @@ import {
 	DeleteProjectRequestSchema,
 } from '../contracts/write'
 import {
+	type CreateAppResponse,
 	CreateAppResponseSchema,
+	type CreateProjectResponse,
 	CreateProjectResponseSchema,
+	type DeleteAppResponse,
 	DeleteAppResponseSchema,
+	type DeleteImpact,
+	type DeleteProjectResponse,
 	DeleteProjectResponseSchema,
-	type DeleteResponse,
 } from '../contracts/write-responses'
 import {
 	errorResult,
@@ -20,26 +24,38 @@ import {
 	writeToolAnnotations,
 } from '../tool-runtime'
 
+/**
+ * The one rule this feature exists to enforce, written once.
+ *
+ * It has to reach the model in three places — both tool descriptions, the server instructions, and
+ * the reminder attached to every preview result — and when those were three hand-written strings
+ * they had already drifted after a single round of edits, with the runtime one (the copy the model
+ * reads at the exact moment it decides) ending up the weakest of the three.
+ */
+export const DELETE_CONFIRMATION_RULE =
+	'Call action "apply" only in a LATER turn, with confirmName set to the name the user typed in a new message of their own. The name they used when asking for the deletion does not count, nor does any name already in this conversation, nor the one in the preview. If there is no interactive user — an unattended or automated run — do not call apply at all; say deletion needs a person and stop.'
+
+const DELETE_PROTOCOL = `Two steps. First call action "preview" for the blast radius and a previewToken that expires in five minutes. Show it and END YOUR TURN. ${DELETE_CONFIRMATION_RULE} This cannot be undone.`
+
+const DELETE_STOP_REMINDER = `STOP HERE. End your turn with this text and wait. ${DELETE_CONFIRMATION_RULE}`
+
+const DELETE_PROJECT_DESCRIPTION = `Permanently delete a project and everything inside it: every app, product, subscriber, purchase, remote config, experiment and customer token balance, plus the analytics history. ${DELETE_PROTOCOL}`
+
+const DELETE_APP_DESCRIPTION = `Permanently delete one app and every product, subscriber, purchase, remote config and experiment inside it, plus its analytics history. The project's entitlement, offering and package ROWS survive, but this app's products are stripped out of them, so a shared package can be left with nothing bound on this platform — the preview counts those bindings. ${DELETE_PROTOCOL}`
+
 function createSummary(
 	resource: string,
-	result: {
-		status: string
-		replayed?: boolean
-		message?: string
-		result?: Record<string, unknown>
-	},
+	result: CreateProjectResponse | CreateAppResponse,
 ) {
-	if (result.status === 'action_required')
-		return (
-			result.message ?? `${resource} requires an AppActor dashboard action.`
-		)
+	if (result.status === 'action_required') return result.message
+	const created = `${resource} created${result.replayed ? ' (replayed)' : ''}.`
 	// The warning is the whole reason the field exists; a client that renders only the text half
 	// would otherwise drop "this app has no Apple credential bound" on the floor.
-	const warning = result.result?.appleConnectionWarning
-	if (typeof warning !== 'string') {
-		return `${resource} created${result.replayed ? ' (replayed)' : ''}.`
-	}
-	return `${resource} created${result.replayed ? ' (replayed)' : ''}. ${warning}`
+	const warning =
+		'appleConnectionWarning' in result.result
+			? result.result.appleConnectionWarning
+			: undefined
+	return warning ? `${created} ${warning}` : created
 }
 
 function countLabel(value: { count: number; atLeast: boolean }) {
@@ -79,6 +95,10 @@ function impactClauses(impact: DeleteImpact, target: 'project' | 'app') {
 	]
 }
 
+/**
+ * Project only: an app preview already opens by naming the app, so listing it again adds a clause
+ * that says nothing. "2 app(s)" is what cannot tell staging from production.
+ */
 function namedApps(impact: DeleteImpact) {
 	if (impact.appNames.length === 0) return ''
 	const shown = impact.appNames.join(', ')
@@ -88,24 +108,26 @@ function namedApps(impact: DeleteImpact) {
 		: ` Apps: ${shown}.`
 }
 
-type DeleteImpact = Extract<DeleteResponse, { status: 'preview' }>['impact']
-
-function deleteSummary(target: 'project' | 'app', result: DeleteResponse) {
-	if (result.status === 'preview') {
-		const { impact } = result
-		const analytics = impact.analyticsPurged
-			? ' The analytics history is permanently purged too.'
-			: ''
-		// Deliberately spelled out rather than summarised: this string is what the user is being asked
-		// to approve, and the confirmation they have to type is the name, not a yes.
-		const stop =
-			'STOP HERE. End your turn with this text and wait. Do not call apply in this turn. Apply belongs in a LATER turn, only after the user has replied with the name themselves — the name they used when asking for the deletion does not count, and neither does this preview.'
-		return `Deleting the ${target} "${result.name}" permanently destroys ${impactClauses(impact, target).join(', ')}.${namedApps(impact)}${analytics} This cannot be undone.\n\n${stop}`
+/**
+ * The target is read off the response rather than passed in. Taking it as an argument meant
+ * `deleteSummary('project', appResult)` type-checked, and the two registration blocks are close
+ * enough to invite exactly that copy-paste.
+ */
+function deleteSummary(result: DeleteProjectResponse | DeleteAppResponse) {
+	if (result.status !== 'preview') {
+		const { target, name, alreadyAbsent } = result.result
+		if (alreadyAbsent)
+			return `The ${target} "${name}" was already deleted; nothing to do.`
+		return `${target} "${name}" deleted${result.replayed ? ' (replayed)' : ''}.`
 	}
-	if (result.result.alreadyAbsent) {
-		return `The ${target} "${result.result.name}" was already deleted; nothing to do.`
-	}
-	return `${target} "${result.result.name}" deleted${result.replayed ? ' (replayed)' : ''}.`
+	const { target, impact } = result
+	const analytics = impact.analyticsPurged
+		? ' The analytics history is permanently purged too.'
+		: ''
+	// Deliberately spelled out rather than summarised: this string is what the user is being asked
+	// to approve, and the confirmation they have to type is the name, not a yes.
+	const apps = target === 'project' ? namedApps(impact) : ''
+	return `Deleting the ${target} "${result.name}" permanently destroys ${impactClauses(impact, target).join(', ')}.${apps}${analytics} This cannot be undone.\n\n${DELETE_STOP_REMINDER}`
 }
 
 export function registerWorkspaceWriteTools(
@@ -165,8 +187,7 @@ export function registerWorkspaceWriteTools(
 		'delete_project',
 		{
 			title: 'Delete AppActor Project',
-			description:
-				'Permanently delete a project and everything inside it: every app, product, subscriber, purchase, remote config, experiment and customer token balance, plus the analytics history. Two steps. First call action "preview" for the blast radius and a previewToken that expires in five minutes. Show it and END YOUR TURN. Then, in a LATER turn, call action "apply" with that token and confirmName set to the name the user typed in a new message of their own. The name they used when asking for the deletion does not count, nor does any name already in this conversation, nor the one in the preview. If there is no interactive user — an unattended or automated run — do not call apply at all; say deletion needs a person and stop. This cannot be undone.',
+			description: DELETE_PROJECT_DESCRIPTION,
 			inputSchema: DeleteProjectRequestSchema,
 			outputSchema: DeleteProjectResponseSchema,
 			annotations: writeToolAnnotations(true, true),
@@ -178,7 +199,7 @@ export function registerWorkspaceWriteTools(
 					{ ...principal, tool: 'delete_project' },
 					request,
 				)
-				return successResult(result, deleteSummary('project', result))
+				return successResult(result, deleteSummary(result))
 			} catch (error) {
 				return errorResult(error, 'idempotencyKey' in request)
 			}
@@ -202,7 +223,7 @@ export function registerWorkspaceWriteTools(
 					{ ...principal, tool: 'delete_app' },
 					request,
 				)
-				return successResult(result, deleteSummary('app', result))
+				return successResult(result, deleteSummary(result))
 			} catch (error) {
 				return errorResult(error, 'idempotencyKey' in request)
 			}

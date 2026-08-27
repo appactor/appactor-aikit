@@ -142,3 +142,28 @@ export function deletePreview(target: 'project' | 'app', name: string) {
 		expiresAt: timestamp,
 	}
 }
+
+export function deleteOutcome(
+	target: 'project' | 'app',
+	name: string,
+	overrides: { alreadyAbsent?: boolean; replayed?: boolean } = {},
+) {
+	const alreadyAbsent = overrides.alreadyAbsent ?? false
+	return succeeded(
+		'apply',
+		{
+			deleted: true as const,
+			alreadyAbsent,
+			target,
+			targetId: target === 'project' ? ids.project : ids.resource,
+			name,
+			// An absent target destroyed nothing, so there is no impact to report.
+			impact: alreadyAbsent
+				? null
+				: target === 'project'
+					? projectDeleteImpact
+					: appDeleteImpact,
+		},
+		overrides.replayed ?? false,
+	)
+}

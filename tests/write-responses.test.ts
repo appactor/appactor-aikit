@@ -11,6 +11,7 @@ import {
 } from '../src/contracts/write-responses'
 import {
 	app,
+	deleteOutcome,
 	deletePreview,
 	entitlement,
 	ids,
@@ -115,31 +116,13 @@ describe('MCP controlled write responses', () => {
 			],
 			[DeleteProjectResponseSchema, deletePreview('project', 'New Project')],
 			[DeleteAppResponseSchema, deletePreview('app', 'Example App')],
-			[
-				DeleteProjectResponseSchema,
-				succeeded('apply', {
-					deleted: true,
-					alreadyAbsent: false,
-					target: 'project',
-					targetId: ids.project,
-					name: 'New Project',
-					impact: projectDeleteImpact,
-				}),
-			],
+			[DeleteProjectResponseSchema, deleteOutcome('project', 'New Project')],
 			[
 				DeleteAppResponseSchema,
-				succeeded(
-					'apply',
-					{
-						deleted: true,
-						alreadyAbsent: true,
-						target: 'app',
-						targetId: ids.resource,
-						name: 'Example App',
-						impact: null,
-					},
-					true,
-				),
+				deleteOutcome('app', 'Example App', {
+					alreadyAbsent: true,
+					replayed: true,
+				}),
 			],
 		] as const
 
@@ -157,28 +140,20 @@ describe('MCP controlled write responses', () => {
 				deletePreview('project', 'New Project'),
 			],
 			[
+				// Hand-written rather than built from deleteOutcome: the point is the extra field.
 				DeleteProjectResponseSchema,
-				succeeded('apply', {
-					deleted: true,
-					alreadyAbsent: false,
-					target: 'project',
-					targetId: ids.project,
-					name: 'New Project',
-					impact: projectDeleteImpact,
+				{
+					...deleteOutcome('project', 'New Project'),
 					previewToken: 'must-not-leak',
-				}),
+				},
 			],
 			[
 				// `deleted: false` has no meaning here: apply either deleted or found it already gone.
 				DeleteProjectResponseSchema,
-				succeeded('apply', {
-					deleted: false,
-					alreadyAbsent: false,
-					target: 'project',
-					targetId: ids.project,
-					name: 'New Project',
-					impact: projectDeleteImpact,
-				}),
+				(() => {
+					const outcome = deleteOutcome('project', 'New Project')
+					return { ...outcome, result: { ...outcome.result, deleted: false } }
+				})(),
 			],
 			[
 				CreateAppResponseSchema,
