@@ -8,13 +8,13 @@ import {
 } from './helpers/mcp-app-fixture'
 import {
 	app,
-	deleteImpact,
 	deletePreview,
 	entitlement,
 	ids,
 	offering,
 	pkg,
 	product,
+	projectDeleteImpact,
 	succeeded,
 	timestamp,
 } from './helpers/write-response-fixtures'
@@ -185,11 +185,8 @@ const scenarios = [
 		response: succeeded('create', {
 			app,
 			publicApiKey: 'pk_public',
-			appleCredentialNotice: {
-				code: 'apple_credential_required',
-				message: 'No Apple credential is connected.',
-				url: 'https://dashboard.example.com/settings?tab=credentials',
-			},
+			appleConnectionWarning:
+				'No Apple credential is connected, so the app was created without one.',
 		}),
 	},
 	{
@@ -218,7 +215,7 @@ const scenarios = [
 			target: 'project',
 			targetId: ids.project,
 			name: 'New Project',
-			impact: deleteImpact,
+			impact: projectDeleteImpact,
 		}),
 	},
 	{

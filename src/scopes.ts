@@ -25,7 +25,7 @@ export const OAUTH_SCOPES_ADVERTISED = [
 	'offline_access',
 ] as const
 
-const TOOL_SCOPES: Record<string, McpScope> = {
+export const TOOL_SCOPES: Record<string, McpScope> = {
 	get_workspace: 'workspace:read',
 	get_app_setup: 'workspace:read',
 	query_analytics: 'analytics:read',

@@ -48,7 +48,8 @@ not prompt you on the first tool call.
 apps, SDK setup keys and store connection status, dashboard analytics,
 the product catalog, one named subscriber, remote config and experiments, and a
 record of what AI clients changed. Writes: products, entitlements, offerings,
-packages, projects, apps, remote config, and experiments.
+packages, projects, apps, remote config, and experiments — plus deleting a
+project or an app, behind a two-step confirmation.
 
 **Skills** that teach your agent the AppActor SDKs and product model:
 
@@ -96,7 +97,14 @@ Deleting a project or an app is available, and only through a two-step preview:
 the first call reports exactly what would be destroyed, the second needs that
 preview's token plus the name typed back by you. It is a separate
 `workspace:delete` scope, so a connection approved before it existed does not
-acquire it silently.
+acquire it silently — you have to approve it again.
+
+To be precise about what that buys: the token is unforgeable and expires in five
+minutes, and the approval is pinned to the structure it described, so an app
+added in between voids it. The typed-back name raises the cost of an accidental
+deletion to two round-trips and a deliberate act. It is not a proof that a human
+was present — that comes from your client's own approval prompt, which is told
+these tools are destructive.
 
 Catalog deletion, entitlement detach, credential upload, reveal or binding, key
 rotation, and webhook secret management are intentionally unavailable to AI

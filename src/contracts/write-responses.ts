@@ -210,21 +210,10 @@ const CreateAppSuccessSchema = successfulOperation(
 		.object({
 			app: AppSchema,
 			publicApiKey: z.string().min(1),
+			// Carries two mutually exclusive cases: an Apple credential was bound and its probe failed,
+			// or no credential was bound at all. Both mean the same thing to the operator -- this app's
+			// Apple connection needs a person in the dashboard.
 			appleConnectionWarning: z.string().optional(),
-			// Present when the app was created with no Apple credential bound: nothing failed, but
-			// product sync and reconciliation stay off until somebody binds one in the dashboard.
-			appleCredentialNotice: z
-				.object({
-					code: z.enum([
-						'apple_credential_required',
-						'apple_credential_selection_required',
-						'apple_credential_unknown',
-					]),
-					message: z.string(),
-					url: z.url(),
-				})
-				.strict()
-				.optional(),
 		})
 		.strict(),
 )
@@ -253,16 +242,32 @@ const BoundedCountSchema = z
 	})
 	.strict()
 
+const Count = z.number().int().min(0)
+
 const DeleteImpactSchema = z
 	.object({
-		apps: z.number().int().min(0),
+		apps: Count,
 		appNames: z.array(z.string()),
-		products: z.number().int().min(0),
-		entitlements: z.number().int().min(0),
-		offerings: z.number().int().min(0),
-		packages: z.number().int().min(0),
+		// True when `appNames` is a sample: it is shorter than `apps` and must not be shown as the
+		// complete list.
+		appNamesTruncated: z.boolean(),
+		products: Count,
+		entitlements: Count,
+		offerings: Count,
+		packages: Count,
+		// Bindings, not rows. An app delete leaves the project's packages and entitlements standing
+		// while stripping this app's products out of them.
+		packageProducts: Count,
+		productEntitlements: Count,
+		remoteConfigs: Count,
+		experiments: Count,
+		tokenBalances: Count,
+		secretKeys: Count,
 		subscribers: BoundedCountSchema,
 		transactions: BoundedCountSchema,
+		// Destruction with no row count to give: the ClickHouse analytics history is queued for a
+		// permanent purge.
+		analyticsPurged: z.boolean(),
 	})
 	.strict()
 
@@ -272,8 +277,10 @@ function deletePreview(target: 'project' | 'app') {
 			status: z.literal('preview'),
 			target: z.literal(target),
 			targetId: Id,
+			// The name the user has to type back. Deliberately NOT also echoed under the request's own
+			// field name: handing a model a `confirmName` in the response is an invitation to copy it
+			// straight into the request without anyone reading anything.
 			name: z.string(),
-			confirmName: z.string(),
 			impact: DeleteImpactSchema,
 			previewToken: z.string(),
 			expiresAt: DateTime,
@@ -304,3 +311,7 @@ export const DeleteAppResponseSchema = z.union([
 	deletePreview('app'),
 	successfulOperation('apply', deleteOutcome('app')),
 ])
+
+export type DeleteResponse =
+	| z.infer<typeof DeleteProjectResponseSchema>
+	| z.infer<typeof DeleteAppResponseSchema>

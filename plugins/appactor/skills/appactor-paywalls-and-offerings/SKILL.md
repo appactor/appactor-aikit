@@ -130,9 +130,12 @@ To take a package off a paywall without the dashboard, set `isActive: false` on
 it with `manage_packages` `update`. The offerings payload only carries active
 packages, so it disappears from the paywall while the row and its history stay.
 
-Deleting a whole project or app *is* available (`delete_project`, `delete_app`),
-and it destroys the catalog inside it along with everything else. See
-`appactor-workspace` for that flow.
+Deleting a whole project *is* available (`delete_project`), and it destroys the
+catalog inside it along with everything else. `delete_app` is different and the
+difference matters here: the project's entitlements, offerings and packages
+survive an app delete, but that app's products do not, so every package loses
+its bindings for that platform and keeps standing with nothing behind them on
+that store. See `appactor-workspace` for both flows.
 
 ## When a catalog change does not take effect
 

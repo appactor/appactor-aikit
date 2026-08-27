@@ -132,23 +132,50 @@ resolve in the dashboard.
 `delete_project` and `delete_app` are the only deletes that exist, they are
 permanent, and they are two calls, never one.
 
-1. `action: "preview"` returns what would be destroyed — apps, products,
-   entitlements, offerings, packages, subscribers, transactions — plus a
-   `previewToken` that expires in five minutes. Subscriber and transaction
-   counts are capped: `atLeast: true` means "this number or more".
-2. Show that to the user in full. **The user types the project or app name
-   back. You never supply `confirmName` yourself**, not from the preview, not
-   from earlier in the conversation. Typing it for them removes the only step
-   that distinguishes a deletion from every other tool call.
-3. `action: "apply"` with the token, the name they typed, and an
-   `idempotencyKey`.
+**They need the `workspace:delete` scope, which is newer than most
+connections.** A connection approved before it existed gets an HTTP 403 with an
+`insufficient_scope` challenge on the first call. That is not a bug and not a
+permissions problem in AppActor — the user has to re-approve the connection to
+grant it. Say that plainly instead of falling back to "open the dashboard".
 
-Apply refuses if the target was renamed or if its contents changed after the
-preview — an app added in between would otherwise be destroyed by an approval
-that never mentioned it. Take a fresh preview and ask again.
+1. `action: "preview"` returns what would be destroyed and a `previewToken`
+   that expires in five minutes.
+2. Show that to the user in full, then **end your turn and wait.**
+3. `action: "apply"` in a **later** turn, with the token, an `idempotencyKey`,
+   and `confirmName` set to the name **the user typed in a message of their
+   own**. Not the name from their original request, not the one in the preview,
+   not one you produce. If nobody is there to type it — an unattended or
+   scheduled run — do not call apply at all; say deletion needs a person.
+
+### Reading the preview
+
+`impact` separates rows from bindings, and the two mean different things:
+
+- A **project** delete destroys apps, products, entitlements, offerings,
+  packages, remote configs, experiments, customer token balances and project
+  secret keys, and queues a permanent purge of the analytics history.
+- An **app** delete leaves the project's entitlement, offering and package rows
+  standing — `entitlements`, `offerings`, `packages` are reported as `0` — but
+  destroys that app's products and therefore its `packageProducts` and
+  `productEntitlements` bindings. A shared package survives with nothing bound
+  on that platform. Say that out loud; it is the part people do not expect.
+- `subscribers` and `transactions` are capped probes: `atLeast: true` means
+  "this number or more", never an exact total.
+- `appNamesTruncated: true` means `appNames` is a sample, not the whole list.
+  Do not present it as complete.
+
+### When apply refuses
+
+Apply refuses if the target was renamed or if its **structure** changed after
+the preview — an app added in between would otherwise be destroyed by an
+approval that never mentioned it. Subscribers and purchases arriving in the
+meantime are fine and do not invalidate anything. On a refusal, take a fresh
+preview, ask again, and use a **new** `idempotencyKey`: a new preview is a
+different request, and the old key is bound to the old one.
 
 `alreadyAbsent: true` means it was already gone. That is a success, not a
-failure; say so and move on.
+failure; say so and move on. It is not the normal retry path — a same-key retry
+of a delete that already succeeded replays the original result instead.
 
 Deleting a project takes every app inside it, and both take their subscribers
 and purchase history. There is no undo and no soft delete.

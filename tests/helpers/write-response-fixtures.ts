@@ -87,15 +87,48 @@ export function succeeded<
 	}
 }
 
-export const deleteImpact = {
-	apps: 1,
-	appNames: ['Example App'],
-	products: 2,
+/**
+ * Two shapes, not one. The API can never return the project shape for an app: an app delete leaves the
+ * project's entitlements, offerings and packages standing and reports them as zero, while reporting
+ * the bindings it strips out of them. A shared fixture would let a bug that renders one as the other
+ * pass unnoticed.
+ */
+export const projectDeleteImpact = {
+	apps: 2,
+	appNames: ['Example App', 'Example App Android'],
+	appNamesTruncated: false,
+	products: 4,
 	entitlements: 1,
 	offerings: 1,
 	packages: 3,
+	packageProducts: 6,
+	productEntitlements: 4,
+	remoteConfigs: 2,
+	experiments: 1,
+	tokenBalances: 0,
+	secretKeys: 1,
 	subscribers: { count: 12, atLeast: false },
 	transactions: { count: 10_000, atLeast: true },
+	analyticsPurged: true,
+}
+
+export const appDeleteImpact = {
+	apps: 1,
+	appNames: ['Example App'],
+	appNamesTruncated: false,
+	products: 2,
+	entitlements: 0,
+	offerings: 0,
+	packages: 0,
+	packageProducts: 3,
+	productEntitlements: 2,
+	remoteConfigs: 1,
+	experiments: 0,
+	tokenBalances: 0,
+	secretKeys: 0,
+	subscribers: { count: 12, atLeast: false },
+	transactions: { count: 10_000, atLeast: true },
+	analyticsPurged: true,
 }
 
 export function deletePreview(target: 'project' | 'app', name: string) {
@@ -104,8 +137,7 @@ export function deletePreview(target: 'project' | 'app', name: string) {
 		target,
 		targetId: target === 'project' ? ids.project : ids.resource,
 		name,
-		confirmName: name,
-		impact: deleteImpact,
+		impact: target === 'project' ? projectDeleteImpact : appDeleteImpact,
 		previewToken: 'p'.repeat(48),
 		expiresAt: timestamp,
 	}

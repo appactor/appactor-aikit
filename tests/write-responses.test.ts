@@ -11,7 +11,6 @@ import {
 } from '../src/contracts/write-responses'
 import {
 	app,
-	deleteImpact,
 	deletePreview,
 	entitlement,
 	ids,
@@ -19,6 +18,7 @@ import {
 	pkg,
 	product,
 	project,
+	projectDeleteImpact,
 	succeeded,
 	timestamp,
 } from './helpers/write-response-fixtures'
@@ -109,11 +109,8 @@ describe('MCP controlled write responses', () => {
 				succeeded('create', {
 					app,
 					publicApiKey: 'pk_public',
-					appleCredentialNotice: {
-						code: 'apple_credential_selection_required',
-						message: 'Several Apple credentials exist.',
-						url: 'https://dashboard.example.com/settings?tab=credentials',
-					},
+					appleConnectionWarning:
+						'No Apple credential is connected, so the app was created without one.',
 				}),
 			],
 			[DeleteProjectResponseSchema, deletePreview('project', 'New Project')],
@@ -126,7 +123,7 @@ describe('MCP controlled write responses', () => {
 					target: 'project',
 					targetId: ids.project,
 					name: 'New Project',
-					impact: deleteImpact,
+					impact: projectDeleteImpact,
 				}),
 			],
 			[
@@ -167,7 +164,7 @@ describe('MCP controlled write responses', () => {
 					target: 'project',
 					targetId: ids.project,
 					name: 'New Project',
-					impact: deleteImpact,
+					impact: projectDeleteImpact,
 					previewToken: 'must-not-leak',
 				}),
 			],
@@ -180,7 +177,7 @@ describe('MCP controlled write responses', () => {
 					target: 'project',
 					targetId: ids.project,
 					name: 'New Project',
-					impact: deleteImpact,
+					impact: projectDeleteImpact,
 				}),
 			],
 			[
