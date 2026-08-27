@@ -63,10 +63,19 @@ export class AppActorApiError extends Error {
 		readonly status: number,
 		readonly code?: string,
 		readonly requestId?: string,
+		/** Seconds the caller should wait, from the upstream Retry-After header. */
+		readonly retryAfterSeconds?: number,
 	) {
 		super(message)
 		this.name = 'AppActorApiError'
 	}
+}
+
+function parseRetryAfter(response: Response) {
+	const raw = response.headers.get('retry-after')
+	if (!raw) return undefined
+	const seconds = Number(raw)
+	return Number.isFinite(seconds) && seconds >= 0 ? seconds : undefined
 }
 
 export class AppActorApiClient {
@@ -129,6 +138,7 @@ export class AppActorApiClient {
 					response.status,
 					error?.code,
 					responseBody?.requestId,
+					parseRetryAfter(response),
 				)
 			}
 			return responseSchema

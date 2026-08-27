@@ -53,7 +53,15 @@ export function errorResult(error: unknown, idempotentWrite = false) {
 		error instanceof AppActorApiError
 			? { code: error.code, requestId: error.requestId, status: error.status }
 			: undefined
+	// A 429 is the one failure the model can actually act on: it is not
+	// uncertain, nothing was written, and there is a concrete wait attached.
+	// Saying so stops an agent from hammering the limit it just hit.
+	const rateLimited = error instanceof AppActorApiError && error.status === 429
+	const waitHint = rateLimited
+		? `\nRate limit reached. Wait ${error.retryAfterSeconds ?? 60} second(s) before calling any AppActor tool again, and slow down afterwards. Nothing was changed by this call.`
+		: ''
 	const retryHint =
+		!rateLimited &&
 		idempotentWrite &&
 		error instanceof AppActorApiError &&
 		(error.status === 408 || error.status >= 500)
@@ -65,8 +73,8 @@ export function errorResult(error: unknown, idempotentWrite = false) {
 			{
 				type: 'text' as const,
 				text: details
-					? `${message}\n${JSON.stringify(details)}${retryHint}`
-					: message,
+					? `${message}\n${JSON.stringify(details)}${waitHint}${retryHint}`
+					: `${message}${waitHint}`,
 			},
 		],
 	}
