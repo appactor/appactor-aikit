@@ -10,7 +10,7 @@ bun run dev                    # watch mode on PORT (default 3100)
 bun run typecheck              # tsc --noEmit
 bun run lint                   # biome check src tests
 bun run lint:fix               # biome check --write
-bun test                       # whole suite, ~400ms, no network
+bun test                       # whole suite, ~500ms, no network
 bun test tests/write-tools.test.ts          # one file
 bun test --test-name-pattern "delete"       # one test by name
 ```
@@ -25,6 +25,7 @@ Two things ship from here, and they have nothing to do with each other at
 runtime:
 
 1. **A remote MCP server** (`src/`) deployed at `https://mcp.appactor.com/mcp`.
+   20 tools over 12 scopes.
 2. **A Claude Code / Codex plugin** (`plugins/appactor/`) — skills plus an
    `.mcp.json` pointing at that hosted server. Users install the plugin; they do
    not run this code.
@@ -34,6 +35,29 @@ one route on the AppActor API. Permissions, idempotency, audit rows, and every
 database write happen there. If a change needs a new query, a new permission
 check, or a new table, it belongs in the API repo, not this one.
 
+## Releasing — do this on EVERY change that touches `plugins/`
+
+`claude plugin update` and the Codex equivalent both key on the version in
+`plugins/appactor/.claude-plugin/plugin.json`, **not** on the marketplace's git
+head. Merging to `main` without bumping it means every installed copy — Claude
+Code and Codex alike, they install the same plugin from the same marketplace —
+reports "already at the latest version" and keeps serving the old skills. The
+server can be days ahead of the skills describing it, and nothing surfaces that.
+
+So a change is not finished until:
+
+1. `plugins/appactor/.claude-plugin/plugin.json` **and** `package.json` carry the
+   same new version. Bump for any skill edit, not only for tool changes: skills
+   are the whole payload of the plugin.
+2. `CHANGELOG.md` has an entry under that version.
+3. The skills agree with the tools. A tool the server advertises but a skill says
+   does not exist will not get used; a skill describing behaviour the API no
+   longer has is worse than no skill.
+
+`tests/skills.test.ts` pins the manifest, the skill list, frontmatter, and that
+every skill is reachable from another — it does **not** read skill content, so
+nothing catches a stale claim except reading the code the claim is about.
+
 ## The paired repo
 
 `appactor-final-api` (locally `../appactor-final-api`, GitHub
@@ -41,7 +65,8 @@ check, or a new table, it belongs in the API repo, not this one.
 
 - `src/routes/internal/mcp.ts` — the routes this server calls
 - `src/services/admin/mcp-write/` — the write implementations and idempotency
-- `src/lib/better-auth.ts` — the OAuth server and its scope list
+- `src/lib/mcp-scopes.ts` — the OAuth scope list (`better-auth.ts` imports it;
+  the backfill script reads it without building a Better Auth instance)
 - `src/lib/mcp-auth-pages.ts` — the consent screen
 
 **Deploy order is API first, always.** Both repos auto-deploy from `main`.
@@ -53,9 +78,8 @@ The `.strict()` constraint below pulls the other way, so a change that adds a
 scope *and* changes a response shape has both. API-first is still right: its
 casualty is a recoverable contract error on one tool for the length of the
 deploy, while MCP-first's is a connection nobody can re-approve. Reduce the
-window instead of reversing the order — make every ADDITIVE field on a read
-`.optional()` here first, so only genuinely changed shapes are exposed to it.
-0.3.0 is the worked example.
+window instead of reversing the order (see the next section). 0.3.0 is the
+worked example.
 
 **Response contracts are `.strict()` on this side.** An extra field the API
 starts returning is a runtime `ZodError`, surfaced to the user as *"AppActor API
@@ -63,6 +87,22 @@ returned an invalid response contract"* with retry advice that loops forever on 
 replayed idempotent write. So an additive field on an API response is a breaking
 change until this repo has deployed a schema that accepts it. Prefer reusing an
 existing optional field over adding one.
+
+### `.nullable()` is not `.optional()`
+
+The read schemas (`src/contracts.ts`) are plain `z.object`, so they *strip*
+unknown keys — an API that starts sending a field they do not declare is safe.
+A **missing** key is not: `z.object({ asa: X.nullable() })` still requires `asa`
+to be present. `null` and absent are different answers, and only `.optional()`
+accepts the second.
+
+Every additive field on a read schema therefore wants `.nullable().optional()`
+even when the API will always send it, because "always" starts at the API's
+deploy and this repo may be ahead of it. Getting this wrong on `connections.asa`
+would have turned every `get_app_setup` call into a 502 for the length of the
+gap. Write schemas are different: they are `.strict()` unions where a
+transitional value has to be spelled out (see the two retained
+`google_credential_*` codes in `write-responses.ts`).
 
 ## Request path
 
@@ -90,7 +130,10 @@ is mapped.
 
 The body hash binding means the request and response schemas must agree with the
 API byte for byte, and that a path is signed exactly as written — verified
-against `canonicalMcpRequestTarget` on the API side.
+against `canonicalMcpRequestTarget` on the API side. A typo in a path or a
+renamed query parameter is a total runtime failure, so every tool needs a test
+that pins its request target; the POST writes get this from `toolCases` in
+`write-tools.test.ts`, and the GETs need it written by hand.
 
 `createMcpHandler`'s default `legacy: 'stateless'` keeps 2025-era clients
 working alongside the 2026-07-28 per-request protocol. Those clients send no
@@ -102,8 +145,13 @@ In this order, or the pieces will not line up:
 
 1. The API route in `appactor-final-api/src/routes/internal/mcp.ts`, wrapped in
    `mcpInternalAuth('<tool_name>', '<scope>')`. Update that repo's
-   `mcp-route-grant-coverage.test.ts` (an exact route allowlist) and
-   `mcp-rate-limit.test.ts` (the limiter tier follows the scope suffix).
+   `mcp-route-grant-coverage.test.ts` (an exact route allowlist).
+   `mcp-rate-limit.test.ts` derives the tier from the scope suffix and needs no
+   edit — but both files scrape the route file with regexes, and Biome wraps a
+   registration whose arguments do not fit on one line. Any regex there must
+   allow `\(\s*'`; one that demanded `\('` silently stopped seeing a route, and
+   the "every route is rate limited" check then compared 19 against 19 and passed
+   over an unmetered route.
 2. `src/scopes.ts` — add to `TOOL_SCOPES`, and to `MCP_SCOPES` only if the scope
    itself is new.
 3. `src/contracts/write.ts` and `write-responses.ts` — must mirror the API's
@@ -112,19 +160,36 @@ In this order, or the pieces will not line up:
 5. `src/tools/*.ts` — `registerTool` with annotations. Reads get
    `READ_TOOL_ANNOTATIONS`; writes get `writeToolAnnotations(destructive,
    openWorld)`. `openWorldHint` is true when the API path reaches a store
-   (Apple/Google), false for purely internal writes.
+   (Apple/Google), false for purely internal writes. In this codebase an update
+   that overwrites existing state counts as `destructive`.
 6. `tests/write-tools.test.ts` pins the full tool list and the annotation map;
-   `tests/app.test.ts` pins the tool count and the advertised scope list.
+   `tests/app.test.ts` pins the tool count and the advertised scope list. Spell
+   the tool list out rather than splicing `toolCases` into it — the list is
+   registration order, and a read registered between two writes cannot be
+   expressed by splicing.
 
-**Adding a new scope has a production step.** Better Auth snapshots the scope
-list onto each OAuth client row at registration time and validates requested
-scopes against that row before the server config. Existing connections therefore
-cannot be granted the new scope — and worse, re-authorizing fails outright with
-`invalid_scope` — until the rows are backfilled. Run
-`appactor-final-api/src/scripts/backfill-mcp-scope.ts --apply` as part of the
-deploy; with no arguments it grants every scope in `src/lib/mcp-scopes.ts` that a
-client row is missing, so it does not need editing per scope. It is a JSONB
-column, `better_auth."oauthClient".scopes`.
+**A `.describe()` on a wrapper does not replace the inner one.**
+`X.nullable().describe(...)` publishes *both* descriptions into the advertised
+JSON schema. Reusing a described base schema for a different field therefore
+ships the wrong prose to the model alongside the right prose. Give such a field
+its own base.
+
+### Adding a new scope has two production steps, not one
+
+Better Auth snapshots the scope list onto each OAuth **client** row at
+registration time and validates requested scopes against that row before the
+server config. Existing connections cannot be granted a newer scope — and worse,
+re-authorizing fails outright with `invalid_scope` — until those rows are
+backfilled. Run `appactor-final-api/src/scripts/backfill-mcp-scope.ts --apply`
+with the API deploy; with no arguments it grants every scope in
+`src/lib/mcp-scopes.ts` that a client row is missing, so it does not need editing
+per scope. It is a JSONB column, `better_auth."oauthClient".scopes`.
+
+That only makes the scope **grantable**. `better_auth."oauthConsent"` holds what
+each connection was actually granted, and nothing can update it server-side — the
+user has to reconnect the client in a browser. Say so plainly when reporting a
+scope rollout as done; a tool answering 403 after a correct deploy is this, not a
+bug.
 
 ## Conventions worth knowing
 
@@ -137,6 +202,12 @@ column, `better_auth."oauthClient".scopes`.
   `runMcpWrite`; apply takes the token. `CONTRIBUTING.md` still says "anything
   destructive belongs in the dashboard, not here" — that predates
   `delete_project` / `delete_app` and is now wrong.
+- **An `action_required` result is not an error and does not claim the key.**
+  The API returns it before `runMcpWrite`, so the caller should retry with the
+  *same* `idempotencyKey` once it has fixed the argument. It also carries
+  `choices` — the values that would have worked — which live only in the
+  structured half of the result, so a summary that does not print them leaves a
+  text-only client with an instruction it cannot follow.
 - **A partial update writes only the keys it was sent.** `updateApp` on the API
   side builds its `SET` clause field by field behind `!== undefined` guards, so
   an absent key is never written. Keep MCP schemas from filling in defaults, or
@@ -147,7 +218,14 @@ column, `better_auth."oauthClient".scopes`.
   are prose an agent reads, so DRY matters less than legibility — but a rule
   stated in more than one place *will* drift. `DELETE_CONFIRMATION_RULE` in
   `src/tools/workspace-writes.ts` is the pattern: state it once, compose the
-  description, the server instructions and the runtime reminder from it.
+  description, the server instructions and the runtime reminder from it. A
+  description assembled by hand-pasting a constant instead of referencing it has
+  already shipped once.
+- **A summary must not re-derive what the API computed.** Prefer the field made
+  for the purpose — `changed` on the update tools, `active` and `effect` on
+  Refund Saver — over inferring it from one input. Refund Saver stores `enabled`
+  and `mode` separately and the dashboard can leave them disagreeing, so "the
+  mode is X" is a true sentence that describes an app doing nothing.
 - **Credential ids are redacted** from every MCP read on the API side, so no
   tool can accept or return one — and that redaction is what forces the
   **name-as-handle** convention. `store_credentials` is UNIQUE on
@@ -174,30 +252,27 @@ does not match what the API really returns makes a test worse than useless. When
 touching a contract, read the actual return site in the API repo rather than
 trusting `tests/helpers/write-response-fixtures.ts`.
 
-`tests/skills.test.ts` checks the plugin manifest, skill frontmatter, and that
-every skill is reachable from another — it does not check skill *content*.
+Two failure modes this suite invites, both of which have shipped green:
 
-## Skills and releases
+- **Asserting the stub.** The fixture supplies a value and the test asserts it
+  back. Assert the tool's *derivation* instead, and pin refusals by counting
+  upstream calls (`expect(upstreamCalls).toBe(0)`) — the fixture's fetcher throws
+  for any request, so `isError: true` is true whether validation ran or not.
+- **Testing enforcement but not transport.** `confirmAppName` had thorough tests
+  of the rule and none that it can be *sent*; deleting the field from either
+  repo's `.strict()` schema deadlocked that mode in both directions with CI
+  green.
 
-Skills in `plugins/appactor/skills/<name>/SKILL.md` are what an agent actually
-reads. A tool the server advertises but the skill says does not exist will not
-get used, so a tool change is not finished until the skill agrees with it.
-
-Write skills from the SDK sources rather than from documentation — the value is
-what only the code shows (an ordering constraint, an error code, a method that
-exists on one type and not another).
-
-**`claude plugin update` keys on the version in
-`plugins/appactor/.claude-plugin/plugin.json`, not on the marketplace's git
-head.** Merging to `main` without bumping it means every installed copy reports
-"already at the latest version" and keeps serving the old skills. Bump
-`plugin.json` and `package.json` together, and turn the CHANGELOG's
-`## Unreleased` into the version.
+The API repo's decision logic is extracted into modules a unit test can import
+(`mcp-write/workspace-decisions.ts`, `mcp-refunds.service.ts`) specifically
+because `credentials.service` opens a database pool at import time — anything
+reachable from it cannot be exercised. Put new pure decisions there, not inline.
 
 ## Git
 
 `origin` is `appactor/appactor-aikit` over the `github-appactor` SSH alias
 (identity `appactor-team`). The local `gh` CLI is authenticated as a different
 account with no write access to that org, so `gh pr create` and `gh pr merge`
-fail there — merge locally and `git push origin main`, or hand over a compare
-URL. `legacy` points at the retired `i-Senku/appactor-mcp` mirror.
+fail there — merge locally (`git merge --squash`) and `git push origin main`, or
+hand over a compare URL. `legacy` points at the retired `i-Senku/appactor-mcp`
+mirror. The API repo has no such split: `gh` works there normally.
