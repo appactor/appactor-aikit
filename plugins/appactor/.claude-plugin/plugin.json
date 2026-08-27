@@ -14,5 +14,7 @@
 		"name": "AppActor",
 		"email": "dev@appactor.com"
 	},
-	"homepage": "https://appactor.com"
+	"homepage": "https://appactor.com",
+	"license": "MIT",
+	"repository": "https://github.com/appactor/appactor-aikit"
 }

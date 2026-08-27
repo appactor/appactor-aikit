@@ -2,7 +2,8 @@ import { describe, expect, test } from 'bun:test'
 import { readFileSync, readdirSync, statSync } from 'node:fs'
 import { join } from 'node:path'
 
-const pluginRoot = join(import.meta.dir, '..')
+const repoRoot = join(import.meta.dir, '..')
+const pluginRoot = join(repoRoot, 'plugins', 'appactor')
 const skillsDir = join(pluginRoot, 'skills')
 
 function parseFrontmatter(source: string) {
@@ -22,6 +23,19 @@ const skillNames = readdirSync(skillsDir).filter((entry) =>
 )
 
 describe('AppActor plugin', () => {
+	test('is listed in the repository marketplace manifest', () => {
+		const marketplace = JSON.parse(
+			readFileSync(
+				join(repoRoot, '.claude-plugin', 'marketplace.json'),
+				'utf8',
+			),
+		) as { plugins?: Array<{ name?: string; source?: string }> }
+		const entry = marketplace.plugins?.find(
+			(plugin) => plugin.name === 'appactor',
+		)
+		expect(entry?.source).toBe('./plugins/appactor')
+	})
+
 	test('declares the remote MCP server under mcpServers', () => {
 		const mcp = JSON.parse(
 			readFileSync(join(pluginRoot, '.mcp.json'), 'utf8'),
