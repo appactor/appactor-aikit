@@ -25,6 +25,44 @@ function bearerToken(request: Request) {
 	return authorization?.startsWith('Bearer ') ? authorization.slice(7) : ''
 }
 
+/**
+ * A token that is genuinely invalid and an authorization server that cannot be
+ * reached look identical to a caller: `createMcpProtectedRequestHandler` turns
+ * every verification failure into the same 401 challenge. They are not the same
+ * thing. A 401 tells a client its token is no good, so it discards it and sends
+ * the person back through a browser approval -- which would sign every
+ * connected client out over a blip in the JWKS endpoint.
+ *
+ * So a 401 is checked against the authorization server before it is passed on.
+ * The result is cached for a few seconds: the probe must not become a way to
+ * make this service hammer the auth server by sending it bad tokens.
+ */
+const JWKS_PROBE_TTL_MS = 5_000
+const JWKS_PROBE_TIMEOUT_MS = 2_000
+
+function createJwksReachabilityProbe(jwksUrl: string) {
+	let cached: { checkedAt: number; reachable: boolean } | null = null
+
+	return async function reachable(): Promise<boolean> {
+		const now = Date.now()
+		if (cached && now - cached.checkedAt < JWKS_PROBE_TTL_MS)
+			return cached.reachable
+		let result: boolean
+		try {
+			const response = await fetch(jwksUrl, {
+				signal: AbortSignal.timeout(JWKS_PROBE_TIMEOUT_MS),
+			})
+			// A 5xx from the authorization server is an outage too, not a verdict
+			// on the token.
+			result = response.status < 500
+		} catch {
+			result = false
+		}
+		cached = { checkedAt: now, reachable: result }
+		return result
+	}
+}
+
 function toAuthInfo(
 	request: Request,
 	claims: JWTPayload,
@@ -89,6 +127,7 @@ export async function createApp(config: Config, fetcher: typeof fetch = fetch) {
 	const mcpHandler = createMcpHandler((context) =>
 		createAppActorMcpServer(api, context.authInfo),
 	)
+	const jwksReachable = createJwksReachabilityProbe(config.MCP_AUTH_JWKS_URL)
 	const createProtectedHandler = (requiredScope: string) =>
 		createMcpProtectedRequestHandler(
 			{
@@ -155,6 +194,14 @@ export async function createApp(config: Config, fetcher: typeof fetch = fetch) {
 					error: error instanceof Error ? error.message : String(error),
 				}),
 			)
+			requests.inc({ route: 'mcp', status: '503' })
+			return c.json(
+				{ error: 'Authorization server is temporarily unavailable.' },
+				503,
+				{ 'retry-after': '5' },
+			)
+		}
+		if (response.status === 401 && !(await jwksReachable())) {
 			requests.inc({ route: 'mcp', status: '503' })
 			return c.json(
 				{ error: 'Authorization server is temporarily unavailable.' },

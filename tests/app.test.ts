@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test } from 'bun:test'
-import { SignJWT, jwtVerify } from 'jose'
+import { SignJWT, generateKeyPair, jwtVerify } from 'jose'
 import { createApp } from '../src/app'
 import {
 	issueAccessToken,
@@ -427,6 +427,41 @@ describe('MCP HTTP app', () => {
 		expect(await response.json()).toEqual({
 			error: 'Authorization server is temporarily unavailable.',
 		})
+	})
+
+	test('still refuses a token signed by the wrong key while the JWKS is up', async () => {
+		// The outage check must not swallow real authentication failures: with the
+		// authorization server answering, a bad token is a bad token.
+		const fixture = await testConfig()
+		const impostor = await generateKeyPair('ES256', { extractable: true })
+		const accessToken = await new SignJWT({
+			client_id: 'codex-client',
+			scope: 'workspace:read',
+		})
+			.setProtectedHeader({ alg: 'ES256', kid: 'oauth-test' })
+			.setIssuer(fixture.config.MCP_AUTH_ISSUER)
+			.setAudience(fixture.config.MCP_RESOURCE_URL)
+			.setSubject('user-1')
+			.setIssuedAt()
+			.setExpirationTime('5m')
+			.sign(impostor.privateKey)
+
+		const response = await fixture.app.request('https://mcp.example.com/mcp', {
+			method: 'POST',
+			headers: {
+				authorization: `Bearer ${accessToken}`,
+				'content-type': 'application/json',
+				'mcp-method': 'tools/list',
+				'mcp-protocol-version': '2026-07-28',
+			},
+			body: JSON.stringify({
+				jsonrpc: '2.0',
+				id: 4,
+				method: 'tools/list',
+				params: { _meta: modernMeta() },
+			}),
+		})
+		expect(response.status).toBe(401)
 	})
 })
 
