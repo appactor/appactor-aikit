@@ -45,11 +45,13 @@ not prompt you on the first tool call.
 ## What you get
 
 **A remote MCP server** for your workspace. Reads: organizations, projects and
-apps, SDK setup keys and store connection status, dashboard analytics,
-the product catalog, one named subscriber, remote config and experiments, and a
-record of what AI clients changed. Writes: products, entitlements, offerings,
-packages, projects, apps, remote config, and experiments — plus deleting a
-project or an app, behind a two-step confirmation.
+apps, SDK setup keys and store connection status, dashboard analytics, the
+product catalog, one named subscriber, remote config and experiments, how an app
+answers Apple's refund requests, and a record of what AI clients changed.
+Writes: products, entitlements, offerings, packages, projects, apps, remote
+config, experiments, and refund handling — plus changing an app's name, bundle
+ID, store credential or Apple Ads connection, and deleting a project or an app
+behind a two-step confirmation.
 
 **Skills** that teach your agent the AppActor SDKs and product model:
 
@@ -58,6 +60,7 @@ project or an app, behind a two-step confirmation.
 | `appactor-workspace` | using the tools: orientation, analytics, idempotent writes, preview/apply |
 | `appactor-paywalls-and-offerings` | products, entitlements, offerings, packages, and building a paywall |
 | `appactor-remote-config-and-experiments` | config keys, targeting rules, variants, traffic weights, metrics |
+| `appactor-refund-saver` | what AppActor tells Apple when a customer asks for a refund |
 | `appactor-troubleshooting` | "paid but no access", stuck receipts, sandbox confusion, signature failures |
 | `appactor-flutter` | `appactor_flutter` |
 | `appactor-ios` | the `AppActor` Swift package |
@@ -106,9 +109,17 @@ deletion to two round-trips and a deliberate act. It is not a proof that a human
 was present — that comes from your client's own approval prompt, which is told
 these tools are destructive.
 
-Catalog deletion, entitlement detach, credential upload, reveal or binding, key
-rotation, and webhook secret management are intentionally unavailable to AI
-clients and stay in the dashboard.
+Refund Saver — what AppActor answers when Apple asks whether to refund an iOS
+purchase — is its own `refunds:read` / `refunds:write` pair for the same reason.
+Granting refunds automatically hands customer money back and cannot be reversed,
+so it is not something a connection acquires by having been allowed to create
+apps.
+
+An app's store credential and Apple Ads connection can be bound and changed, but
+only **by name** — the ids are redacted out of every read, and there is still no
+way to upload, reveal or rotate a credential from here. Catalog deletion,
+entitlement detach, key rotation, and webhook secret management are intentionally
+unavailable to AI clients and stay in the dashboard.
 
 ## Repository layout
 

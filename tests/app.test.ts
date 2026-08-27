@@ -77,6 +77,8 @@ describe('MCP HTTP app', () => {
 				'config:read',
 				'config:write',
 				'audit:read',
+				'refunds:read',
+				'refunds:write',
 				// Advertised so clients ask for it: without it Better Auth mints no
 				// refresh token and the connection dies an hour after approval.
 				'offline_access',
@@ -398,7 +400,7 @@ describe('MCP HTTP app', () => {
 		const listBody = await readJsonRpcBody(list)
 		expect(
 			(listBody.result?.tools as Array<{ name: string }>).map((t) => t.name),
-		).toHaveLength(17)
+		).toHaveLength(20)
 	})
 
 	test('returns 503 instead of 500 when the JWKS endpoint is unreachable', async () => {

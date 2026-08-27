@@ -72,6 +72,7 @@ describe('AppActor plugin', () => {
 			'appactor-ios',
 			'appactor-paywalls-and-offerings',
 			'appactor-react-native',
+			'appactor-refund-saver',
 			'appactor-remote-config-and-experiments',
 			'appactor-troubleshooting',
 			'appactor-workspace',

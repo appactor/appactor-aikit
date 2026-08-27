@@ -4,7 +4,7 @@ const Id = z.string().min(1)
 const InputId = z.uuid()
 const NullableUrl = z.url().nullable()
 
-const AppleWebhookStatusSchema = z.object({
+export const AppleWebhookStatusSchema = z.object({
 	state: z.enum(['not_verified', 'checking', 'verified', 'failed']),
 	source: z.enum(['test_notification', 'live_notification']).nullable(),
 	verifiedAt: z.string().nullable(),
@@ -21,6 +21,11 @@ const AppleWebhookStatusSchema = z.object({
 			attemptDate: z.string().nullable(),
 		})
 		.nullable(),
+})
+
+export const AsaConnectionRefSchema = z.object({
+	name: z.string(),
+	appleOrgId: z.number().nullable(),
 })
 
 export const PaginationSchema = z.object({
@@ -97,6 +102,27 @@ export const AppSetupSchema = z.object({
 		apple: z.unknown().nullable(),
 		google: z.unknown().nullable(),
 		appleWebhookStatus: AppleWebhookStatusSchema.nullable(),
+		// Null for Android. `available` is here because the caller can only ever name a connection --
+		// ids are redacted -- so without the list an agent asked to bind one has nothing to pick from.
+		asa: z
+			.object({
+				bound: AsaConnectionRefSchema.nullable(),
+				available: z.array(AsaConnectionRefSchema),
+				// `awaiting_attribution` is the normal state right after binding, not a fault: the import
+				// waits for the SDK to report this app's first ASA-attributed install.
+				attributionState: z.enum([
+					'not_configured',
+					'awaiting_attribution',
+					'active',
+				]),
+				firstAttributionDay: z.string().nullable(),
+			})
+			// Optional as well as nullable, so this schema can ship before the API that sends the field.
+			// `null` is what an Android app returns; ABSENT is what an API without the field returns, and
+			// requiring the key would have turned every get_app_setup call into an
+			// UPSTREAM_CONTRACT_INVALID for the whole window between the two deploys.
+			.nullable()
+			.optional(),
 	}),
 	links: z.object({
 		dashboard: z.url(),

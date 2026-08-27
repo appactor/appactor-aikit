@@ -15,7 +15,9 @@ import {
 	offering,
 	pkg,
 	project,
+	refundSaverChange,
 	succeeded,
+	updateOutcome,
 } from './helpers/write-response-fixtures'
 
 const organizationId = ids.organization
@@ -93,6 +95,17 @@ const toolCases = [
 		},
 	},
 	{
+		name: 'update_app',
+		scope: 'workspace:write',
+		path: '/v1/internal/mcp/apps/update',
+		arguments: {
+			organizationId,
+			idempotencyKey: 'update-app-1',
+			appId: resourceId,
+			name: 'Renamed App',
+		},
+	},
+	{
 		name: 'delete_project',
 		scope: 'workspace:delete',
 		path: '/v1/internal/mcp/projects/delete',
@@ -103,6 +116,17 @@ const toolCases = [
 		scope: 'workspace:delete',
 		path: '/v1/internal/mcp/apps/delete',
 		arguments: { action: 'preview', organizationId, appId: resourceId },
+	},
+	{
+		name: 'manage_refund_saver',
+		scope: 'refunds:write',
+		path: '/v1/internal/mcp/refund-saver',
+		arguments: {
+			organizationId,
+			idempotencyKey: 'refund-saver-1',
+			appId: resourceId,
+			mode: 'prefer_decline',
+		},
 	},
 ] as const
 
@@ -144,7 +168,17 @@ describe('MCP controlled write tools', () => {
 			'get_audit_log',
 			'manage_remote_config',
 			'manage_experiments',
-			...toolCases.map((tool) => tool.name),
+			'manage_products',
+			'manage_entitlements',
+			'manage_offerings',
+			'manage_packages',
+			'create_project',
+			'create_app',
+			'update_app',
+			'delete_project',
+			'delete_app',
+			'get_refund_saver',
+			'manage_refund_saver',
 		])
 		const expectedAnnotations = {
 			manage_products: { destructiveHint: true, openWorldHint: true },
@@ -153,8 +187,12 @@ describe('MCP controlled write tools', () => {
 			manage_packages: { destructiveHint: true, openWorldHint: false },
 			create_project: { destructiveHint: false, openWorldHint: false },
 			create_app: { destructiveHint: false, openWorldHint: true },
+			update_app: { destructiveHint: true, openWorldHint: true },
 			delete_project: { destructiveHint: true, openWorldHint: true },
 			delete_app: { destructiveHint: true, openWorldHint: true },
+			// The write never leaves AppActor -- Apple is consulted later, when a refund request
+			// actually arrives -- but it overwrites a policy that decides where money goes.
+			manage_refund_saver: { destructiveHint: true, openWorldHint: false },
 		}
 		for (const [name, expected] of Object.entries(expectedAnnotations)) {
 			expect(
@@ -209,6 +247,18 @@ describe('MCP controlled write tools', () => {
 						url: 'https://dashboard.example.com/settings?tab=credentials',
 					},
 					requestId: 'request-2',
+				})
+			}
+			if (verified.payload.tool === 'update_app') {
+				return Response.json({
+					data: updateOutcome({ changed: ['name'] }),
+					requestId: 'request-6',
+				})
+			}
+			if (verified.payload.tool === 'manage_refund_saver') {
+				return Response.json({
+					data: refundSaverChange(),
+					requestId: 'request-7',
 				})
 			}
 			if (verified.payload.tool === 'delete_project') {

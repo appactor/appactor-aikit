@@ -43,6 +43,10 @@ import {
 	ManagePackagesRequestSchema,
 	type ManageProductsRequest,
 	ManageProductsRequestSchema,
+	type ManageRefundSaverRequest,
+	ManageRefundSaverRequestSchema,
+	type UpdateAppRequest,
+	UpdateAppRequestSchema,
 } from './contracts/write'
 import {
 	CreateAppResponseSchema,
@@ -53,6 +57,9 @@ import {
 	ManageOfferingsResponseSchema,
 	ManagePackagesResponseSchema,
 	ManageProductsResponseSchema,
+	ManageRefundSaverResponseSchema,
+	RefundSaverResponseSchema,
+	UpdateAppResponseSchema,
 } from './contracts/write-responses'
 import { InternalTokenSigner, type InternalToolPrincipal } from './internal-jwt'
 import { canonicalRequestTarget, sha256Hex } from './request-binding'
@@ -394,6 +401,43 @@ export class AppActorApiClient {
 			request,
 			DeleteAppRequestSchema,
 			DeleteAppResponseSchema,
+		)
+	}
+
+	updateApp(auth: InternalToolPrincipal, request: UpdateAppRequest) {
+		return this.postValidated(
+			'/v1/internal/mcp/apps/update',
+			auth,
+			request,
+			UpdateAppRequestSchema,
+			UpdateAppResponseSchema,
+		)
+	}
+
+	getRefundSaver(
+		auth: InternalToolPrincipal,
+		organizationId: string,
+		appId: string,
+	) {
+		return this.request(
+			'GET',
+			`/v1/internal/mcp/apps/${encodeURIComponent(appId)}/refund-saver?organizationId=${encodeURIComponent(organizationId)}`,
+			auth,
+			undefined,
+			RefundSaverResponseSchema,
+		)
+	}
+
+	manageRefundSaver(
+		auth: InternalToolPrincipal,
+		request: ManageRefundSaverRequest,
+	) {
+		return this.postValidated(
+			'/v1/internal/mcp/refund-saver',
+			auth,
+			request,
+			ManageRefundSaverRequestSchema,
+			ManageRefundSaverResponseSchema,
 		)
 	}
 }

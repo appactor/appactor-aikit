@@ -143,5 +143,5 @@ request answerable.
 
 Finding organization/project IDs and the rules for the write tools:
 `appactor-workspace`. Catalog structure: `appactor-paywalls-and-offerings`.
-Platform specifics: `appactor-flutter`, `appactor-ios`, `appactor-android`,
-`appactor-react-native`.
+Answering Apple's refund requests: `appactor-refund-saver`. Platform specifics:
+`appactor-flutter`, `appactor-ios`, `appactor-android`, `appactor-react-native`.

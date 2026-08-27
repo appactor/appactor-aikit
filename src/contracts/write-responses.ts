@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { AppleWebhookStatusSchema } from '../contracts'
 
 const Id = z.uuid()
 const DateTime = z.string().datetime()
@@ -219,19 +220,80 @@ const CreateAppSuccessSchema = successfulOperation(
 		.strict(),
 )
 
+/**
+ * Every way "no credential got bound" can happen, and what the caller can do about it.
+ *
+ * `choices` is what makes these recoverable without a human: it names the credentials that WOULD
+ * have worked, so the next call can pass one. It is absent -- never empty -- when there is nothing
+ * to choose from, and absent for `credential_read_forbidden` because the names are the thing being
+ * withheld from a connection that may not read them.
+ *
+ * The two `google_*` codes are the pre-rename spelling. They are still accepted so this schema can
+ * ship BEFORE the API that stops emitting them; without them, every Android create_app during the
+ * deploy gap would fail this `.strict()` union after having already created the app.
+ */
+const CredentialActionRequiredSchema = z
+	.object({
+		status: z.literal('action_required'),
+		code: z.enum([
+			'credential_required',
+			'credential_selection_required',
+			'credential_not_found',
+			'credential_read_forbidden',
+			'google_credential_required',
+			'google_credential_selection_required',
+		]),
+		store: z.enum(['apple', 'google']).optional(),
+		message: z.string(),
+		url: z.url(),
+		choices: z.array(z.string()).optional(),
+	})
+	.strict()
+
 export const CreateAppResponseSchema = z.union([
-	z
-		.object({
-			status: z.literal('action_required'),
-			code: z.enum([
-				'google_credential_required',
-				'google_credential_selection_required',
-			]),
-			message: z.string(),
-			url: z.url(),
-		})
-		.strict(),
+	CredentialActionRequiredSchema,
 	CreateAppSuccessSchema,
+])
+
+const AsaConnectionRefSchema = z
+	.object({ name: z.string(), appleOrgId: z.number().nullable() })
+	.strict()
+
+export const UpdateAppResponseSchema = z.union([
+	CredentialActionRequiredSchema,
+	successfulOperation(
+		'update',
+		z
+			.object({
+				app: AppSchema,
+				// Which fields actually moved, so a summary can say what changed instead of restating the
+				// request back at the user.
+				changed: z.array(z.string()),
+				// Present only when the credential or bundle id changed on an iOS app: changing either
+				// invalidates the stored Apple connection state, so it is re-probed and reported here
+				// rather than left reading as `not_configured` with no way to tell if it really is.
+				appleConnection: z
+					.object({
+						status: z.string(),
+						lastErrorCode: z.string().nullable(),
+						lastError: z.string().nullable(),
+					})
+					.strict()
+					.nullable(),
+				googleSetup: z
+					.object({
+						credentialConfigured: z.boolean(),
+						rtdnStatus: z.string(),
+						reasonCode: z.string(),
+						nextAction: z.string(),
+						isUserFixable: z.boolean(),
+					})
+					.strict()
+					.nullable(),
+				asaConnection: AsaConnectionRefSchema.nullable(),
+			})
+			.strict(),
+	),
 ])
 
 const BoundedCountSchema = z
@@ -311,6 +373,49 @@ export const DeleteAppResponseSchema = z.union([
 	successfulOperation('apply', deleteOutcome('app')),
 ])
 
+/**
+ * `enabled` and `active` are both here on purpose. The stored row carries `enabled` and `mode`
+ * separately, and the dashboard can leave them disagreeing -- the toggle on with the mode left at
+ * `do_not_handle` reads as configured and answers Apple nothing. `active` is the honest summary of
+ * the pair, and `effect` says in one sentence what happens today.
+ */
+const RefundSaverViewSchema = z
+	.object({
+		app: z.object({ id: Id, name: z.string(), platform: z.string() }).strict(),
+		mode: z.enum([
+			'do_not_handle',
+			'submit_consumption_data',
+			'prefer_decline',
+			'prefer_grant_full',
+		]),
+		consentPolicy: z.enum(['opt_out', 'opt_in']),
+		enabled: z.boolean(),
+		active: z.boolean(),
+		effect: z.string(),
+		appleWebhook: AppleWebhookStatusSchema.nullable(),
+		// False means Apple's refund question never reaches AppActor, so nothing can be turned on --
+		// but turning OFF stays available, which is why this gates only one direction.
+		canEnable: z.boolean(),
+		links: z
+			.object({ dashboard: z.url(), appleWebhookSetup: z.url() })
+			.strict(),
+	})
+	.strict()
+
+export const RefundSaverResponseSchema = RefundSaverViewSchema
+
+export const ManageRefundSaverResponseSchema = successfulOperation(
+	'update',
+	RefundSaverViewSchema.extend({
+		previousMode: z.string(),
+		previousEffect: z.string(),
+		// `mode` alone cannot answer "did anything change": `enabled` is derived from it and
+		// `consentPolicy` rides along, and re-sending the current mode with a new consent policy is the
+		// ONLY way to change that policy from here.
+		changed: z.array(z.string()),
+	}).strict(),
+)
+
 export type CreateProjectResponse = z.infer<typeof CreateProjectResponseSchema>
 export type CreateAppResponse = z.infer<typeof CreateAppResponseSchema>
 export type DeleteImpact = z.infer<typeof DeleteImpactSchema>
@@ -319,3 +424,8 @@ export type DeleteAppResponse = z.infer<typeof DeleteAppResponseSchema>
 export type DeleteResponse =
 	| z.infer<typeof DeleteProjectResponseSchema>
 	| z.infer<typeof DeleteAppResponseSchema>
+export type UpdateAppResponse = z.infer<typeof UpdateAppResponseSchema>
+export type RefundSaverResponse = z.infer<typeof RefundSaverResponseSchema>
+export type ManageRefundSaverResponse = z.infer<
+	typeof ManageRefundSaverResponseSchema
+>

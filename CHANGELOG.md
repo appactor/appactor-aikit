@@ -1,5 +1,53 @@
 # Changelog
 
+## 0.3.0
+
+- **`create_app` now requires a store credential on both platforms.** It used to
+  create an iOS app unbound and warn about it; that produced apps whose product
+  sync, restore history and subscription reconciliation were silently off. You
+  can now name the credential (`credentialName`), so refusing costs one field
+  instead of a trip to the dashboard.
+- **Credentials are chosen by name.** Credential ids are redacted out of every
+  MCP read, so "more than one credential exists" used to be a dead end. Names are
+  unique per organization, so `credentialName: "AnimalSound ASC"` picks one
+  exactly. A refusal carries the names that would have worked — except when the
+  organization has none, where there is nothing to list and only a person can
+  fix it.
+- **New `update_app`.** Changes an app's name, bundle ID or package name, bound
+  store credential, and Apple Ads connection. It is a partial update: a field you
+  omit is never written. Changing the credential or bundle ID re-verifies the
+  Apple connection and reports whether it actually works — adding a credential in
+  AppActor only checks that the `.p8` parses, it never contacts Apple, so this is
+  the first time anyone asks Apple about that specific bundle ID.
+- **Apple Ads (ASA) connections can be bound from MCP.** Also by name, also on
+  `update_app`, and `null` unbinds. Unlike credentials, Apple Ads names are not
+  unique — if two match, the tool refuses and prints the Apple org ids rather
+  than binding an app's attribution to the wrong account. `get_app_setup` now
+  lists the available connections under `connections.asa`.
+- **New Refund Saver tools**, `get_refund_saver` and `manage_refund_saver`, for
+  what AppActor answers when Apple asks whether to refund an iOS purchase. One
+  `mode` instead of the stored `enabled` + `mode` pair: with the toggle on and
+  the mode left at `do_not_handle`, the settings row reads as configured and
+  answers Apple nothing. iOS only.
+- **New `refunds:read` and `refunds:write` scopes.** **Existing connections have
+  to be approved again** before they can use the Refund Saver tools.
+  `prefer_grant_full` hands customer money back and a granted refund cannot be
+  reversed, so it does not arrive as a silent upgrade to `workspace:write` — and
+  it additionally requires the app's name typed back.
+- New `appactor-refund-saver` skill, and `appactor-workspace` rewritten around
+  the credential and Apple Ads flows.
+
+**Deploy the API first.** Both halves of this release cross the two repos, and
+the constraints run in opposite directions: the new scopes have to be registered
+with the authorization server before this server advertises them, or
+re-authorizing any connection fails outright with `invalid_scope`; while the new
+`create_app` refusal shape is rejected by *this* server's previous release. API
+first makes the second one a recoverable error on one tool — a `create_app` that
+needs a credential decision reports a contract error and creates nothing — for
+the few minutes between the deploys. MCP first would break re-authorization
+entirely, which is worse. Run `backfill-mcp-scope.ts --apply` with the API
+deploy.
+
 ## 0.2.0
 
 - `delete_project` and `delete_app`: the first deletes on the MCP surface, behind

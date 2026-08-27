@@ -9,6 +9,12 @@ export const MCP_SCOPES = [
 	'config:read',
 	'config:write',
 	'audit:read',
+	// Split off workspace:write for the same reason workspace:delete was: prefer_grant_full hands
+	// customer money back and a granted refund cannot be reversed, so folding it into a scope every
+	// connection already holds would have handed that power to all of them on deploy day with no
+	// re-consent. The in-tool confirmation is enforced by a model; requirePrincipal is not.
+	'refunds:read',
+	'refunds:write',
 ] as const
 
 export type McpScope = (typeof MCP_SCOPES)[number]
@@ -41,6 +47,9 @@ export const TOOL_SCOPES: Record<string, McpScope> = {
 	manage_packages: 'catalog:write',
 	create_project: 'workspace:write',
 	create_app: 'workspace:write',
+	update_app: 'workspace:write',
+	get_refund_saver: 'refunds:read',
+	manage_refund_saver: 'refunds:write',
 	delete_project: 'workspace:delete',
 	delete_app: 'workspace:delete',
 }

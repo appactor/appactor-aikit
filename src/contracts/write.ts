@@ -192,11 +192,21 @@ export const CreateProjectRequestSchema = z
 	})
 	.strict()
 
+const CredentialName = z
+	.string()
+	.trim()
+	.min(1)
+	.max(255)
+	.describe(
+		'The NAME of a store credential as it appears in AppActor Settings > Credentials, e.g. "AnimalSound ASC". Never a credential id, and never credential JSON. Omit it when the organization has exactly one credential for this platform; if it has several, the tool answers with the names to choose from.',
+	)
+
 const CreateAppBase = {
 	organizationId: OrganizationId,
 	idempotencyKey: IdempotencyKey,
 	projectId: ResourceId,
-	name: z.string().min(1).max(255),
+	name: z.string().trim().min(1).max(255),
+	credentialName: CredentialName.optional(),
 }
 
 export const CreateAppRequestSchema = z.discriminatedUnion('platform', [
@@ -262,6 +272,81 @@ export const DeleteAppRequestSchema = z.discriminatedUnion('action', [
 		.strict(),
 ])
 
+export const UpdateAppRequestSchema = z
+	.object({
+		organizationId: OrganizationId,
+		idempotencyKey: IdempotencyKey,
+		appId: ResourceId,
+		name: z.string().trim().min(1).max(255).optional(),
+		bundleId: z
+			.string()
+			.trim()
+			.min(1)
+			.max(255)
+			.optional()
+			.describe(
+				'iOS apps only. Changing it re-verifies the Apple connection, which is scoped to the bundle id.',
+			),
+		packageName: z
+			.string()
+			.trim()
+			.min(1)
+			.max(255)
+			.optional()
+			.describe('Android apps only.'),
+		credentialName: CredentialName.optional(),
+		// Its own base string, not `CredentialName`: a description set on the outer nullable wrapper is
+		// published ALONGSIDE the inner one, so reusing CredentialName advertised "as it appears in
+		// Settings > Credentials ... omit it when the organization has exactly one" for a field where
+		// every clause of that is false.
+		asaConnectionName: z
+			.string()
+			.trim()
+			.min(1)
+			.max(255)
+			.nullable()
+			.optional()
+			.describe(
+				'iOS apps only. The NAME of an Apple Ads connection, as get_app_setup lists under connections.asa.available. Pass null to unbind, which stops Apple Ads imports for this app and destroys nothing. Omit it to leave the current binding alone.',
+			),
+	})
+	.strict()
+	.describe(
+		'Send only the fields you want to change. A field you omit is not written at all, so changing the credential cannot clear the bundle id.',
+	)
+
+export const ManageRefundSaverRequestSchema = z
+	.object({
+		organizationId: OrganizationId,
+		idempotencyKey: IdempotencyKey,
+		appId: ResourceId,
+		mode: z
+			.enum([
+				'do_not_handle',
+				'submit_consumption_data',
+				'prefer_decline',
+				'prefer_grant_full',
+			])
+			.describe(
+				'What AppActor answers when Apple asks whether to refund a purchase. do_not_handle: answer nothing, which turns Refund Saver off. submit_consumption_data: send how much was consumed without asking for an outcome. prefer_decline: ask Apple to decline the refund. prefer_grant_full: ask Apple to grant it in full — this gives customer money back and cannot be reversed.',
+			),
+		consentPolicy: z
+			.enum(['opt_out', 'opt_in'])
+			.optional()
+			.describe(
+				"Whether a customer's consumption data may be sent to Apple. Leave it out unless the user asks: omitting it keeps whatever is already set, and an app that was never configured is already opt_out.",
+			),
+		confirmAppName: z
+			.string()
+			.min(1)
+			.max(255)
+			.optional()
+			.describe(
+				"Required for prefer_grant_full only, and must be the app's exact name. Ask the user to confirm in a message of their own before sending it; a granted refund cannot be taken back.",
+			),
+	})
+	.strict()
+
 export type ManageProductsRequest = z.infer<typeof ManageProductsRequestSchema>
 export type ManageEntitlementsRequest = z.infer<
 	typeof ManageEntitlementsRequestSchema
@@ -274,3 +359,7 @@ export type CreateProjectRequest = z.infer<typeof CreateProjectRequestSchema>
 export type CreateAppRequest = z.infer<typeof CreateAppRequestSchema>
 export type DeleteProjectRequest = z.infer<typeof DeleteProjectRequestSchema>
 export type DeleteAppRequest = z.infer<typeof DeleteAppRequestSchema>
+export type UpdateAppRequest = z.infer<typeof UpdateAppRequestSchema>
+export type ManageRefundSaverRequest = z.infer<
+	typeof ManageRefundSaverRequestSchema
+>

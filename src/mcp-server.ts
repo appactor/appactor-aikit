@@ -16,6 +16,7 @@ import {
 } from './tool-runtime'
 import { registerCatalogWriteTools } from './tools/catalog-writes'
 import { registerConfigTools } from './tools/config-tools'
+import { registerRefundTools } from './tools/refunds'
 import { registerSubscriberReadTools } from './tools/subscriber-reads'
 import {
 	DELETE_CONFIRMATION_RULE,
@@ -29,7 +30,8 @@ const SERVER_INSTRUCTIONS = [
 	'For every logical write, generate one idempotencyKey. If a timeout or uncertain result occurs, retry the exact same arguments with that same key; never generate a new key for the retry.',
 	'Show an offering publication preview to the user and obtain approval before apply_publish.',
 	`Deleting a project or an app is permanent: show the preview, end your turn, and ${DELETE_CONFIRMATION_RULE.charAt(0).toLowerCase()}${DELETE_CONFIRMATION_RULE.slice(1)}`,
-	'Never request store credential JSON.',
+	'Never request store credential JSON. Store credentials and Apple Ads connections are chosen by name.',
+	'Setting a refund mode of prefer_grant_full makes AppActor grant refunds automatically and cannot be reversed: get the user to confirm in a message of their own before calling it.',
 ].join(' ')
 
 function workspaceSummary(data: Workspace) {
@@ -177,6 +179,7 @@ export function createAppActorMcpServer(
 	registerConfigTools(server, api, authInfo)
 	registerCatalogWriteTools(server, api, authInfo)
 	registerWorkspaceWriteTools(server, api, authInfo)
+	registerRefundTools(server, api, authInfo)
 
 	return server
 }
