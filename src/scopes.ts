@@ -12,6 +12,15 @@ export const MCP_SCOPES = [
 
 export type McpScope = (typeof MCP_SCOPES)[number]
 
+/**
+ * Advertised alongside the tool scopes but never required by a tool: a client
+ * reads `scopes_supported` to decide what to ask for, and Better Auth mints a
+ * refresh token only when `offline_access` is among the scopes it was asked
+ * for. Leaving it out is why a connection stopped working an hour after it was
+ * approved and had to be approved again in a browser.
+ */
+export const OAUTH_SCOPES_ADVERTISED = [...MCP_SCOPES, 'offline_access'] as const
+
 const TOOL_SCOPES: Record<string, McpScope> = {
 	get_workspace: 'workspace:read',
 	get_app_setup: 'workspace:read',

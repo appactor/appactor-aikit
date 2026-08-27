@@ -76,6 +76,9 @@ describe('MCP HTTP app', () => {
 				'config:read',
 				'config:write',
 				'audit:read',
+				// Advertised so clients ask for it: without it Better Auth mints no
+				// refresh token and the connection dies an hour after approval.
+				'offline_access',
 			],
 		})
 		expect(
@@ -121,6 +124,42 @@ describe('MCP HTTP app', () => {
 		expect(response.headers.get('www-authenticate')).toContain(
 			'insufficient_scope',
 		)
+		expect(response.headers.get('www-authenticate')).toContain('workspace:read')
+	})
+
+	test('does not let offline_access stand in for a tool scope', async () => {
+		// It is advertised so a client asks for it and gets a refresh token, but
+		// it grants no tool: a token carrying only offline_access is still refused.
+		const fixture = await testConfig()
+		const accessToken = await new SignJWT({
+			client_id: 'codex-client',
+			scope: 'offline_access',
+		})
+			.setProtectedHeader({ alg: 'ES256', kid: 'oauth-test' })
+			.setIssuer(fixture.config.MCP_AUTH_ISSUER)
+			.setAudience(fixture.config.MCP_RESOURCE_URL)
+			.setSubject('user-1')
+			.setIssuedAt()
+			.setExpirationTime('5m')
+			.sign(fixture.oauthKeys.privateKey)
+
+		const response = await fixture.app.request('https://mcp.example.com/mcp', {
+			method: 'POST',
+			headers: {
+				authorization: `Bearer ${accessToken}`,
+				'content-type': 'application/json',
+				'mcp-method': 'tools/call',
+				'mcp-name': 'get_workspace',
+				'mcp-protocol-version': '2026-07-28',
+			},
+			body: JSON.stringify({
+				jsonrpc: '2.0',
+				id: 3,
+				method: 'tools/call',
+				params: { name: 'get_workspace', arguments: {}, _meta: modernMeta() },
+			}),
+		})
+		expect(response.status).toBe(403)
 		expect(response.headers.get('www-authenticate')).toContain('workspace:read')
 	})
 

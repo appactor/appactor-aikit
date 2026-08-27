@@ -7,7 +7,7 @@ import { Counter, Registry } from 'prom-client'
 import { AppActorApiClient } from './appactor-api'
 import type { Config } from './config'
 import { createAppActorMcpServer } from './mcp-server'
-import { MCP_SCOPES, requiredScopeForRequest } from './scopes'
+import { MCP_SCOPES, OAUTH_SCOPES_ADVERTISED, requiredScopeForRequest } from './scopes'
 
 function claimScopes(value: unknown): string[] {
 	if (typeof value === 'string') return value.split(/\s+/).filter(Boolean)
@@ -108,7 +108,7 @@ export async function createApp(config: Config, fetcher: typeof fetch = fetch) {
 		resource: config.MCP_RESOURCE_URL,
 		authorization_servers: [config.MCP_AUTH_ISSUER],
 		bearer_methods_supported: ['header'],
-		scopes_supported: [...MCP_SCOPES],
+		scopes_supported: [...OAUTH_SCOPES_ADVERTISED],
 	}
 	for (const path of [
 		'/.well-known/oauth-protected-resource',
