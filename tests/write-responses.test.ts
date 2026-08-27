@@ -2,6 +2,8 @@ import { describe, expect, test } from 'bun:test'
 import {
 	CreateAppResponseSchema,
 	CreateProjectResponseSchema,
+	DeleteAppResponseSchema,
+	DeleteProjectResponseSchema,
 	ManageEntitlementsResponseSchema,
 	ManageOfferingsResponseSchema,
 	ManagePackagesResponseSchema,
@@ -9,12 +11,15 @@ import {
 } from '../src/contracts/write-responses'
 import {
 	app,
+	deleteOutcome,
+	deletePreview,
 	entitlement,
 	ids,
 	offering,
 	pkg,
 	product,
 	project,
+	projectDeleteImpact,
 	succeeded,
 	timestamp,
 } from './helpers/write-response-fixtures'
@@ -100,6 +105,25 @@ describe('MCP controlled write responses', () => {
 				CreateAppResponseSchema,
 				succeeded('create', { app, publicApiKey: 'pk_public' }, true),
 			],
+			[
+				CreateAppResponseSchema,
+				succeeded('create', {
+					app,
+					publicApiKey: 'pk_public',
+					appleConnectionWarning:
+						'No Apple credential is connected, so the app was created without one.',
+				}),
+			],
+			[DeleteProjectResponseSchema, deletePreview('project', 'New Project')],
+			[DeleteAppResponseSchema, deletePreview('app', 'Example App')],
+			[DeleteProjectResponseSchema, deleteOutcome('project', 'New Project')],
+			[
+				DeleteAppResponseSchema,
+				deleteOutcome('app', 'Example App', {
+					alreadyAbsent: true,
+					replayed: true,
+				}),
+			],
 		] as const
 
 		for (const [schema, response] of responses) {
@@ -109,6 +133,28 @@ describe('MCP controlled write responses', () => {
 
 	test('fails closed on secret-bearing or unexpected upstream fields', () => {
 		const unsafeResponses = [
+			[
+				// A delete response that claims the wrong target would let a project preview be
+				// presented to the user as an app deletion.
+				DeleteAppResponseSchema,
+				deletePreview('project', 'New Project'),
+			],
+			[
+				// Hand-written rather than built from deleteOutcome: the point is the extra field.
+				DeleteProjectResponseSchema,
+				{
+					...deleteOutcome('project', 'New Project'),
+					previewToken: 'must-not-leak',
+				},
+			],
+			[
+				// `deleted: false` has no meaning here: apply either deleted or found it already gone.
+				DeleteProjectResponseSchema,
+				(() => {
+					const outcome = deleteOutcome('project', 'New Project')
+					return { ...outcome, result: { ...outcome.result, deleted: false } }
+				})(),
+			],
 			[
 				CreateAppResponseSchema,
 				succeeded('create', {

@@ -9,6 +9,7 @@ import {
 	stopTestServers,
 } from './helpers/mcp-app-fixture'
 import {
+	deletePreview,
 	entitlement,
 	ids,
 	offering,
@@ -91,6 +92,18 @@ const toolCases = [
 			packageName: 'com.example.android',
 		},
 	},
+	{
+		name: 'delete_project',
+		scope: 'workspace:delete',
+		path: '/v1/internal/mcp/projects/delete',
+		arguments: { action: 'preview', organizationId, projectId },
+	},
+	{
+		name: 'delete_app',
+		scope: 'workspace:delete',
+		path: '/v1/internal/mcp/apps/delete',
+		arguments: { action: 'preview', organizationId, appId: resourceId },
+	},
 ] as const
 
 describe('MCP controlled write tools', () => {
@@ -140,6 +153,8 @@ describe('MCP controlled write tools', () => {
 			manage_packages: { destructiveHint: true, openWorldHint: false },
 			create_project: { destructiveHint: false, openWorldHint: false },
 			create_app: { destructiveHint: false, openWorldHint: true },
+			delete_project: { destructiveHint: true, openWorldHint: true },
+			delete_app: { destructiveHint: true, openWorldHint: true },
 		}
 		for (const [name, expected] of Object.entries(expectedAnnotations)) {
 			expect(
@@ -194,6 +209,18 @@ describe('MCP controlled write tools', () => {
 						url: 'https://dashboard.example.com/settings?tab=credentials',
 					},
 					requestId: 'request-2',
+				})
+			}
+			if (verified.payload.tool === 'delete_project') {
+				return Response.json({
+					data: deletePreview('project', 'New Project'),
+					requestId: 'request-4',
+				})
+			}
+			if (verified.payload.tool === 'delete_app') {
+				return Response.json({
+					data: deletePreview('app', 'Example App'),
+					requestId: 'request-5',
 				})
 			}
 			const data =

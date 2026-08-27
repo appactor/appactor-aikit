@@ -11,6 +11,11 @@ const IdempotencyKey = z
 		'Generate once per logical operation. After a timeout or uncertain result, retry the exact same arguments with this same key; never generate a new key for that retry.',
 	)
 const OptionalDisplayName = z.string().max(255).nullable().optional()
+const PreviewToken = z
+	.string()
+	.min(32)
+	.max(4096)
+	.describe('The previewToken returned by the matching preview action.')
 const PackageType = z.enum([
 	'lifetime',
 	'annual',
@@ -127,7 +132,7 @@ export const ManageOfferingsRequestSchema = z.discriminatedUnion('action', [
 			action: z.literal('apply_publish'),
 			organizationId: OrganizationId,
 			idempotencyKey: IdempotencyKey,
-			previewToken: z.string().min(32).max(4096),
+			previewToken: PreviewToken,
 		})
 		.strict(),
 ])
@@ -211,6 +216,52 @@ export const CreateAppRequestSchema = z.discriminatedUnion('platform', [
 		.strict(),
 ])
 
+const DeleteConfirmName = z
+	.string()
+	.min(1)
+	.max(255)
+	.describe(
+		"The name of the project or app exactly as the preview reported it, typed back by the user. Never invent this value or copy it from the preview on the user's behalf.",
+	)
+
+export const DeleteProjectRequestSchema = z.discriminatedUnion('action', [
+	z
+		.object({
+			action: z.literal('preview'),
+			organizationId: OrganizationId,
+			projectId: ResourceId,
+		})
+		.strict(),
+	z
+		.object({
+			action: z.literal('apply'),
+			organizationId: OrganizationId,
+			idempotencyKey: IdempotencyKey,
+			previewToken: PreviewToken,
+			confirmName: DeleteConfirmName,
+		})
+		.strict(),
+])
+
+export const DeleteAppRequestSchema = z.discriminatedUnion('action', [
+	z
+		.object({
+			action: z.literal('preview'),
+			organizationId: OrganizationId,
+			appId: ResourceId,
+		})
+		.strict(),
+	z
+		.object({
+			action: z.literal('apply'),
+			organizationId: OrganizationId,
+			idempotencyKey: IdempotencyKey,
+			previewToken: PreviewToken,
+			confirmName: DeleteConfirmName,
+		})
+		.strict(),
+])
+
 export type ManageProductsRequest = z.infer<typeof ManageProductsRequestSchema>
 export type ManageEntitlementsRequest = z.infer<
 	typeof ManageEntitlementsRequestSchema
@@ -221,3 +272,5 @@ export type ManageOfferingsRequest = z.infer<
 export type ManagePackagesRequest = z.infer<typeof ManagePackagesRequestSchema>
 export type CreateProjectRequest = z.infer<typeof CreateProjectRequestSchema>
 export type CreateAppRequest = z.infer<typeof CreateAppRequestSchema>
+export type DeleteProjectRequest = z.infer<typeof DeleteProjectRequestSchema>
+export type DeleteAppRequest = z.infer<typeof DeleteAppRequestSchema>

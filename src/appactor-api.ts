@@ -31,6 +31,10 @@ import {
 	CreateAppRequestSchema,
 	type CreateProjectRequest,
 	CreateProjectRequestSchema,
+	type DeleteAppRequest,
+	DeleteAppRequestSchema,
+	type DeleteProjectRequest,
+	DeleteProjectRequestSchema,
 	type ManageEntitlementsRequest,
 	ManageEntitlementsRequestSchema,
 	type ManageOfferingsRequest,
@@ -43,6 +47,8 @@ import {
 import {
 	CreateAppResponseSchema,
 	CreateProjectResponseSchema,
+	DeleteAppResponseSchema,
+	DeleteProjectResponseSchema,
 	ManageEntitlementsResponseSchema,
 	ManageOfferingsResponseSchema,
 	ManagePackagesResponseSchema,
@@ -368,6 +374,26 @@ export class AppActorApiClient {
 			request,
 			CreateAppRequestSchema,
 			CreateAppResponseSchema,
+		)
+	}
+
+	deleteProject(auth: InternalToolPrincipal, request: DeleteProjectRequest) {
+		return this.postValidated(
+			'/v1/internal/mcp/projects/delete',
+			auth,
+			request,
+			DeleteProjectRequestSchema,
+			DeleteProjectResponseSchema,
+		)
+	}
+
+	deleteApp(auth: InternalToolPrincipal, request: DeleteAppRequest) {
+		return this.postValidated(
+			'/v1/internal/mcp/apps/delete',
+			auth,
+			request,
+			DeleteAppRequestSchema,
+			DeleteAppResponseSchema,
 		)
 	}
 }

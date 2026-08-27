@@ -8,11 +8,14 @@ import {
 } from './helpers/mcp-app-fixture'
 import {
 	app,
+	deleteOutcome,
+	deletePreview,
 	entitlement,
 	ids,
 	offering,
 	pkg,
 	product,
+	projectDeleteImpact,
 	succeeded,
 	timestamp,
 } from './helpers/write-response-fixtures'
@@ -169,6 +172,62 @@ const scenarios = [
 		},
 		response: succeeded('create', { app, publicApiKey: 'pk_public' }, true),
 	},
+	{
+		name: 'create_app',
+		path: '/v1/internal/mcp/apps',
+		arguments: {
+			organizationId: ids.organization,
+			idempotencyKey: 'create-ios-app-2',
+			projectId: ids.project,
+			name: 'Unbound App',
+			platform: 'ios',
+			bundleId: 'com.example.unbound',
+		},
+		response: succeeded('create', {
+			app,
+			publicApiKey: 'pk_public',
+			appleConnectionWarning:
+				'No Apple credential is connected, so the app was created without one.',
+		}),
+	},
+	{
+		name: 'delete_project',
+		path: '/v1/internal/mcp/projects/delete',
+		arguments: {
+			action: 'preview',
+			organizationId: ids.organization,
+			projectId: ids.project,
+		},
+		response: deletePreview('project', 'New Project'),
+	},
+	{
+		name: 'delete_project',
+		path: '/v1/internal/mcp/projects/delete',
+		arguments: {
+			action: 'apply',
+			organizationId: ids.organization,
+			idempotencyKey: 'delete-project-1',
+			previewToken: 'p'.repeat(48),
+			confirmName: 'New Project',
+		},
+		response: deleteOutcome('project', 'New Project'),
+	},
+	{
+		name: 'delete_app',
+		path: '/v1/internal/mcp/apps/delete',
+		arguments: {
+			action: 'apply',
+			organizationId: ids.organization,
+			idempotencyKey: 'delete-app-1',
+			previewToken: 'p'.repeat(48),
+			confirmName: 'Example App',
+		},
+		// The retry-after-an-interrupted-delete shape: succeeded, nothing destroyed, no impact to report.
+		response: deleteOutcome('app', 'Example App', {
+			alreadyAbsent: true,
+			replayed: true,
+		}),
+	},
 ] as const
 
 describe('MCP write action protocol coverage', () => {
@@ -185,7 +244,7 @@ describe('MCP write action protocol coverage', () => {
 		})
 		const token = await issueAccessToken(
 			fixture,
-			'catalog:write workspace:write',
+			'catalog:write workspace:write workspace:delete',
 		)
 
 		for (const scenario of scenarios) {

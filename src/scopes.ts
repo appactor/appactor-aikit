@@ -4,6 +4,7 @@ export const MCP_SCOPES = [
 	'catalog:read',
 	'catalog:write',
 	'workspace:write',
+	'workspace:delete',
 	'subscribers:read',
 	'config:read',
 	'config:write',
@@ -24,7 +25,7 @@ export const OAUTH_SCOPES_ADVERTISED = [
 	'offline_access',
 ] as const
 
-const TOOL_SCOPES: Record<string, McpScope> = {
+export const TOOL_SCOPES: Record<string, McpScope> = {
 	get_workspace: 'workspace:read',
 	get_app_setup: 'workspace:read',
 	query_analytics: 'analytics:read',
@@ -40,6 +41,8 @@ const TOOL_SCOPES: Record<string, McpScope> = {
 	manage_packages: 'catalog:write',
 	create_project: 'workspace:write',
 	create_app: 'workspace:write',
+	delete_project: 'workspace:delete',
+	delete_app: 'workspace:delete',
 }
 
 export function requiredScopeForRequest(request: Request): McpScope {

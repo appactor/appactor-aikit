@@ -2,6 +2,7 @@ import { z } from 'zod'
 
 const Id = z.uuid()
 const DateTime = z.string().datetime()
+const Count = z.number().int().min(0)
 
 const ProductSchema = z
 	.object({
@@ -47,9 +48,9 @@ const PackageSchema = z
 		offeringId: Id,
 		packageType: z.string(),
 		displayName: z.string(),
-		position: z.number().int().min(0),
+		position: Count,
 		isActive: z.boolean(),
-		tokenAmount: z.number().int().min(0).nullable(),
+		tokenAmount: Count.nullable(),
 		createdAt: DateTime,
 		updatedAt: DateTime,
 	})
@@ -121,8 +122,8 @@ export const ManageProductsResponseSchema = z.union([
 		'import',
 		z
 			.object({
-				imported: z.number().int().min(0),
-				total: z.number().int().min(0),
+				imported: Count,
+				total: Count,
 				products: z.array(ProductSchema),
 			})
 			.strict(),
@@ -158,8 +159,8 @@ export const ManageOfferingsResponseSchema = z.union([
 				.object({
 					currentOfferingId: Id.nullable(),
 					nextOfferingId: Id,
-					packageCount: z.number().int().min(0),
-					packageProductCount: z.number().int().min(0),
+					packageCount: Count,
+					packageProductCount: Count,
 				})
 				.strict(),
 		})
@@ -190,7 +191,7 @@ export const ManagePackagesResponseSchema = z.union([
 						packageId: Id,
 						productId: Id,
 						googleOfferId: z.string().nullable(),
-						position: z.number().int().min(0),
+						position: Count,
 						createdAt: DateTime,
 					})
 					.strict(),
@@ -210,6 +211,9 @@ const CreateAppSuccessSchema = successfulOperation(
 		.object({
 			app: AppSchema,
 			publicApiKey: z.string().min(1),
+			// Carries two mutually exclusive cases: an Apple credential was bound and its probe failed,
+			// or no credential was bound at all. Both mean the same thing to the operator -- this app's
+			// Apple connection needs a person in the dashboard.
 			appleConnectionWarning: z.string().optional(),
 		})
 		.strict(),
@@ -229,3 +233,89 @@ export const CreateAppResponseSchema = z.union([
 		.strict(),
 	CreateAppSuccessSchema,
 ])
+
+const BoundedCountSchema = z
+	.object({
+		count: Count,
+		// True when the real number is larger than `count`: the preview probes with a bounded scan
+		// instead of counting every row of a table that can hold millions.
+		atLeast: z.boolean(),
+	})
+	.strict()
+
+const DeleteImpactSchema = z
+	.object({
+		apps: Count,
+		appNames: z.array(z.string()),
+		// True when `appNames` is a sample: it is shorter than `apps` and must not be shown as the
+		// complete list.
+		appNamesTruncated: z.boolean(),
+		products: Count,
+		entitlements: Count,
+		offerings: Count,
+		packages: Count,
+		// Bindings, not rows. An app delete leaves the project's packages and entitlements standing
+		// while stripping this app's products out of them.
+		packageProducts: Count,
+		productEntitlements: Count,
+		remoteConfigs: Count,
+		experiments: Count,
+		tokenBalances: Count,
+		secretKeys: Count,
+		subscribers: BoundedCountSchema,
+		transactions: BoundedCountSchema,
+		// Destruction with no row count to give: the ClickHouse analytics history is queued for a
+		// permanent purge.
+		analyticsPurged: z.boolean(),
+	})
+	.strict()
+
+function deletePreview(target: 'project' | 'app') {
+	return z
+		.object({
+			status: z.literal('preview'),
+			target: z.literal(target),
+			targetId: Id,
+			// The name the user has to type back. Deliberately NOT also echoed under the request's own
+			// field name: handing a model a `confirmName` in the response is an invitation to copy it
+			// straight into the request without anyone reading anything.
+			name: z.string(),
+			impact: DeleteImpactSchema,
+			previewToken: z.string(),
+			expiresAt: DateTime,
+		})
+		.strict()
+}
+
+function deleteOutcome(target: 'project' | 'app') {
+	return z
+		.object({
+			deleted: z.literal(true),
+			// True when the target was already gone: the delete was a no-op, not a failure.
+			alreadyAbsent: z.boolean(),
+			target: z.literal(target),
+			targetId: Id,
+			name: z.string(),
+			impact: DeleteImpactSchema.nullable(),
+		})
+		.strict()
+}
+
+export const DeleteProjectResponseSchema = z.union([
+	deletePreview('project'),
+	successfulOperation('apply', deleteOutcome('project')),
+])
+
+export const DeleteAppResponseSchema = z.union([
+	deletePreview('app'),
+	successfulOperation('apply', deleteOutcome('app')),
+])
+
+export type CreateProjectResponse = z.infer<typeof CreateProjectResponseSchema>
+export type CreateAppResponse = z.infer<typeof CreateAppResponseSchema>
+export type DeleteImpact = z.infer<typeof DeleteImpactSchema>
+export type DeleteProjectResponse = z.infer<typeof DeleteProjectResponseSchema>
+export type DeleteAppResponse = z.infer<typeof DeleteAppResponseSchema>
+export type DeleteResponse =
+	| z.infer<typeof DeleteProjectResponseSchema>
+	| z.infer<typeof DeleteAppResponseSchema>

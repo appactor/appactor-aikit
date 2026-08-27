@@ -17,10 +17,20 @@ import {
 import { registerCatalogWriteTools } from './tools/catalog-writes'
 import { registerConfigTools } from './tools/config-tools'
 import { registerSubscriberReadTools } from './tools/subscriber-reads'
-import { registerWorkspaceWriteTools } from './tools/workspace-writes'
+import {
+	DELETE_CONFIRMATION_RULE,
+	registerWorkspaceWriteTools,
+} from './tools/workspace-writes'
 
-const SERVER_INSTRUCTIONS =
-	'For every logical write, generate one idempotencyKey. If a timeout or uncertain result occurs, retry the exact same arguments with that same key; never generate a new key for the retry. Show an offering publication preview to the user and obtain approval before apply_publish. Never request store credential JSON.'
+// One entry per rule, joined at the end. As a single literal this was a 647-character unwrappable
+// line carrying four unrelated policies, so every edit showed up as a whole-line rewrite with no
+// visible delta.
+const SERVER_INSTRUCTIONS = [
+	'For every logical write, generate one idempotencyKey. If a timeout or uncertain result occurs, retry the exact same arguments with that same key; never generate a new key for the retry.',
+	'Show an offering publication preview to the user and obtain approval before apply_publish.',
+	`Deleting a project or an app is permanent: show the preview, end your turn, and ${DELETE_CONFIRMATION_RULE.charAt(0).toLowerCase()}${DELETE_CONFIRMATION_RULE.slice(1)}`,
+	'Never request store credential JSON.',
+].join(' ')
 
 function workspaceSummary(data: Workspace) {
 	const more = data.appsPagination?.hasMore ? ' More apps are available.' : ''
