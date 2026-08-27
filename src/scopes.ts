@@ -19,7 +19,10 @@ export type McpScope = (typeof MCP_SCOPES)[number]
  * for. Leaving it out is why a connection stopped working an hour after it was
  * approved and had to be approved again in a browser.
  */
-export const OAUTH_SCOPES_ADVERTISED = [...MCP_SCOPES, 'offline_access'] as const
+export const OAUTH_SCOPES_ADVERTISED = [
+	...MCP_SCOPES,
+	'offline_access',
+] as const
 
 const TOOL_SCOPES: Record<string, McpScope> = {
 	get_workspace: 'workspace:read',

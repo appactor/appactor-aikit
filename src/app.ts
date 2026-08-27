@@ -7,7 +7,11 @@ import { Counter, Registry } from 'prom-client'
 import { AppActorApiClient } from './appactor-api'
 import type { Config } from './config'
 import { createAppActorMcpServer } from './mcp-server'
-import { MCP_SCOPES, OAUTH_SCOPES_ADVERTISED, requiredScopeForRequest } from './scopes'
+import {
+	MCP_SCOPES,
+	OAUTH_SCOPES_ADVERTISED,
+	requiredScopeForRequest,
+} from './scopes'
 
 function claimScopes(value: unknown): string[] {
 	if (typeof value === 'string') return value.split(/\s+/).filter(Boolean)
