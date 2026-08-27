@@ -57,9 +57,9 @@ export function registerConfigTools(
 	server.registerTool(
 		'get_audit_log',
 		{
-			title: 'Read AppActor MCP Write History',
+			title: 'Read AppActor Change History',
 			description:
-				'Read the record of changes AI clients made to this AppActor organization: actor, client, tool, action, outcome, and the resources touched. This covers MCP writes only; AppActor has no organization-wide dashboard audit log. Defaults to the caller own operations; the organization scope needs the AppActor team.manage permission.',
+				'Read the record of changes made to this AppActor organization: actor, client, tool, action, outcome, and the resources touched. source "mcp" (the default) is what AI clients changed; source "dashboard" is what people changed through the AppActor dashboard or admin API. Defaults to the caller own operations; the organization scope needs the AppActor team.manage permission.',
 			inputSchema: AuditRequestSchema,
 			outputSchema: AuditResponseSchema,
 			annotations: READ_TOOL_ANNOTATIONS,

@@ -474,11 +474,22 @@ describe('config contracts', () => {
 		).toThrow()
 	})
 
-	test('defaults the audit scope to the caller own operations', () => {
+	test('defaults the audit scope to the caller own MCP operations', () => {
 		expect(AuditRequestSchema.parse({ organizationId })).toEqual({
 			organizationId,
+			source: 'mcp',
 			scope: 'mine',
 			limit: 50,
 		})
+	})
+
+	test('can ask for what people changed in the dashboard instead', () => {
+		// The organization-wide dashboard audit log is real; the tool used to
+		// deny it existed and had no way to request it.
+		const parsed = AuditRequestSchema.parse({
+			organizationId,
+			source: 'dashboard',
+		})
+		expect(parsed.source).toBe('dashboard')
 	})
 })

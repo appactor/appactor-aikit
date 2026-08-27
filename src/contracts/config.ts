@@ -91,6 +91,12 @@ export type ConfigRequest = z.infer<typeof ConfigRequestSchema>
 export const AuditRequestSchema = z
 	.object({
 		organizationId: OrganizationId,
+		source: z
+			.enum(['mcp', 'dashboard'])
+			.default('mcp')
+			.describe(
+				'"mcp" is what AI clients changed. "dashboard" is what people changed through the AppActor dashboard or admin API.',
+			),
 		scope: z
 			.enum(['mine', 'organization'])
 			.default('mine')
@@ -407,7 +413,7 @@ export const ConfigResponseSchema = z.object({
 })
 
 export const AuditResponseSchema = z.object({
-	view: z.literal('mcp_write_operations'),
+	view: z.enum(['mcp_write_operations', 'admin_audit_log']),
 	scope: z.enum(['mine', 'organization']),
 	data: Payload,
 	generatedAt: z.string(),

@@ -20,6 +20,13 @@ export const SubscriberRequestSchema = z.discriminatedUnion('action', [
 			projectId: ResourceId.optional(),
 			appId: ResourceId.optional(),
 			limit: z.number().int().min(1).max(25).default(10),
+			cursor: z
+				.string()
+				.max(2048)
+				.optional()
+				.describe(
+					'The nextCursor from a previous lookup, to read the next page.',
+				),
 		})
 		.strict(),
 	z
