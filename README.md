@@ -13,15 +13,20 @@ Ask it to add subscriptions to your Flutter app and it already knows the API.
 
 ```bash
 claude plugin marketplace add appactor/appactor-aikit
-claude plugin install appactor@appactor
+claude plugin install appactor
 ```
 
 **Codex CLI**
 
 ```bash
-codex mcp add appactor --url https://mcp.appactor.com/mcp
+codex plugin marketplace add appactor/appactor-aikit
+codex plugin add appactor@appactor
 codex mcp login appactor
 ```
+
+Installing the plugin brings the skills across as well. If you only want the
+tools, `codex mcp add appactor --url https://mcp.appactor.com/mcp` registers the
+server on its own.
 
 **Any other MCP client**
 
@@ -33,6 +38,9 @@ https://mcp.appactor.com/mcp
 
 The client discovers AppActor's OAuth automatically and opens a browser to sign
 in. Your AppActor session cookie never leaves that browser.
+
+In Claude Code, run `/mcp`, pick `appactor`, and choose Authenticate if it does
+not prompt you on the first tool call.
 
 ## What you get
 
