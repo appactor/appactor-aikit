@@ -2,6 +2,11 @@
 	"name": "appactor-mcp",
 	"version": "0.1.0",
 	"private": true,
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/appactor/appactor-aikit.git"
+	},
+	"homepage": "https://github.com/appactor/appactor-aikit",
 	"type": "module",
 	"scripts": {
 		"dev": "bun run --watch src/index.ts",
