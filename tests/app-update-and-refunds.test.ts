@@ -184,6 +184,32 @@ const refundArgs = {
 }
 
 describe('Refund Saver tools', () => {
+	test('get_refund_saver does not claim to be read-only', async () => {
+		// Reading it advances the Apple webhook verification the answer is about: it
+		// asks Apple whether the test notification arrived and starts a new one if
+		// the last attempt settled without an answer. Hosts use `readOnlyHint` to
+		// skip a confirmation prompt, so it has to mean what it says.
+		const fixture = await createMcpAppFixture()
+		const token = await issueAccessToken(fixture, 'workspace:read')
+		const response = await mcpRpc(fixture, token, 'tools/list', {
+			_meta: modernMeta(),
+		})
+		const body = await response.json()
+		const tools = body.result.tools as Array<{
+			name: string
+			annotations: Record<string, boolean>
+		}>
+
+		expect(
+			tools.find((tool) => tool.name === 'get_refund_saver')?.annotations,
+		).toMatchObject({
+			readOnlyHint: false,
+			destructiveHint: false,
+			idempotentHint: false,
+			openWorldHint: true,
+		})
+	})
+
 	test('a workspace:write grant does not carry refund handling with it', async () => {
 		// The whole point of the separate scope: prefer_grant_full hands customer money back, and every
 		// connection approved before this feature existed approved creating and changing apps, not that.

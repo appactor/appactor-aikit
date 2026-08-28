@@ -9,7 +9,7 @@ import {
 	RefundSaverResponseSchema,
 } from '../contracts/write-responses'
 import {
-	READ_TOOL_ANNOTATIONS,
+	READ_TOOL_ANNOTATIONS_OPEN_WORLD,
 	errorResult,
 	requirePrincipal,
 	successResult,
@@ -76,7 +76,7 @@ export function registerRefundTools(
 			description: GET_REFUND_SAVER_DESCRIPTION,
 			inputSchema: z.object({ organizationId: z.uuid(), appId: z.uuid() }),
 			outputSchema: RefundSaverResponseSchema,
-			annotations: READ_TOOL_ANNOTATIONS,
+			annotations: READ_TOOL_ANNOTATIONS_OPEN_WORLD,
 		},
 		async ({ organizationId, appId }) => {
 			try {

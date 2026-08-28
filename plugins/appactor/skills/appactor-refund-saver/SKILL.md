@@ -61,9 +61,31 @@ and there is nothing to answer — so turning Refund Saver on is refused until i
 is.
 
 `get_refund_saver` reports this as `canEnable`, with the webhook state and a
-dashboard link beside it. Webhook setup means pasting a URL into App Store
-Connect, so it cannot be done from here. Send the user to the link, and check
-`canEnable` again afterwards.
+dashboard link beside it.
+
+**An app you created with `create_app` already has the URL set.** AppActor writes
+it into App Store Connect using the same credential the app was bound with, for
+both Production and Sandbox. There is nothing for the user to paste.
+
+**Reading is what verifies it.** Calling `get_refund_saver` again does not just
+re-check a value — it advances the verification: it asks Apple whether the test
+notification arrived, and starts a new one if the last attempt settled without
+an answer. So `not_verified` on the first read is the expected result, not a
+problem.
+
+**Wait about a minute between reads.** Apple takes minutes to start honouring a
+URL it was just given, and each read past the last attempt asks it to deliver
+another test notification. Polling in a tight loop spends the customer's App
+Store Connect rate limit and changes nothing.
+
+Two cases where it will not resolve on its own, and the state says which:
+
+- **A pre-existing app.** Nothing here sets the URL for an app AppActor did not
+  create — send the user to the dashboard link, where it is now one button
+  rather than a copy-paste.
+- **A read-only API key.** App Store Connect refuses the write from a key whose
+  role is Developer. The dashboard reports that in words; from here it looks
+  like a webhook that never verifies.
 
 **Turning it off is never gated.** An app whose webhook has broken can still be
 switched to `do_not_handle`.

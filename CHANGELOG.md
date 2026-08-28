@@ -1,5 +1,28 @@
 # Changelog
 
+## 0.3.1
+
+- **The Apple webhook no longer needs a person.** AppActor now writes the App
+  Store Server Notifications URL into App Store Connect itself, for both
+  Production and Sandbox, using the credential the app is already bound with — so
+  an iOS app created with `create_app` arrives with the URL set. The
+  `appactor-refund-saver` skill said this "cannot be done from here"; it now says
+  what actually happens, including the two cases that still need a person: an app
+  AppActor did not create, and an App Store Connect key whose role is Developer,
+  which Apple refuses the write from.
+- **`get_refund_saver` is no longer annotated read-only.** Reading it advances
+  the webhook verification the answer is about — it asks Apple whether the test
+  notification arrived and starts a new one if the last attempt settled without
+  an answer. That writes verification state and can make Apple deliver a
+  notification, so `readOnlyHint` and `idempotentHint` are now false and
+  `openWorldHint` true, matching every other tool here whose path reaches a
+  store. Hosts use `readOnlyHint` to skip a confirmation prompt; it has to mean
+  what it says.
+- **The skill now says to wait about a minute between reads.** Each read past the
+  last attempt asks Apple for another test notification, and Apple takes minutes
+  to start honouring a URL it was just given, so a tight polling loop spends the
+  customer's rate limit and changes nothing.
+
 ## 0.3.0
 
 - **`create_app` now requires a store credential on both platforms.** It used to

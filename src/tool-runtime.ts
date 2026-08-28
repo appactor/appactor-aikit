@@ -8,6 +8,24 @@ export const READ_TOOL_ANNOTATIONS = {
 	openWorldHint: false,
 } as const
 
+/**
+ * A read whose answer the API has to go and find out.
+ *
+ * `readOnlyHint` gates auto-approval in most hosts, so it has to mean what it
+ * says: this tool changes nothing. `get_refund_saver` no longer qualifies —
+ * reading it advances the Apple webhook verification the answer is about, which
+ * writes verification state and can ask Apple to deliver a test notification.
+ * Nothing is destroyed, but a repeat call is not free and the domain is not
+ * closed, which is the same reason every store-touching write here carries
+ * `openWorldHint: true`.
+ */
+export const READ_TOOL_ANNOTATIONS_OPEN_WORLD = {
+	readOnlyHint: false,
+	destructiveHint: false,
+	idempotentHint: false,
+	openWorldHint: true,
+} as const
+
 export function writeToolAnnotations(
 	destructiveHint: boolean,
 	openWorldHint: boolean,
