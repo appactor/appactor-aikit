@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.3.2
+
+- **SDK skills teach the new offerings and experiments API.** The iOS, Android,
+  Flutter, and React Native skills — and the remote-config-and-experiments
+  skill — now show `offeringKey`, `getOffering(offeringKey)` / `offering(_:)`,
+  `offerings["key"]`, `allOfferings`, the one-call SDK-level `getOffering`, and
+  `getExperiment(key)` / `experiment(_:)`, which never returns null and carries
+  typed getters with defaults. `offeringByLookupKey` / `offering(lookupKey:)`
+  no longer exist in the SDKs (iOS 0.1.13, Android 2.3.15, Flutter 0.0.24,
+  React Native 0.1.4), so an agent following the old skills would have written
+  code that does not compile.
+
 ## 0.3.1
 
 - **The Apple webhook no longer needs a person.** AppActor now writes the App
