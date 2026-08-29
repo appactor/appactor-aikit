@@ -75,6 +75,7 @@ AppActor.reset()
 val offerings = AppActor.offerings()
 val offering = offerings.current
 val annual = offering?.packageFor(AppActorPackageType.Annual)
+val onboarding = offerings["onboarding"]           // by offeringKey (the dashboard lookup key)
 ```
 
 `offerings(fetchPolicy)` controls freshness:
@@ -95,6 +96,12 @@ AppActor.setFallbackOfferings(assets.open("offerings.json").readBytes())
 
 `AppActor.cachedOfferings` and `AppActor.cachedRemoteConfigs` read the last
 synced values with no suspension.
+
+`AppActorOfferings` also exposes `allOfferings` (current first),
+`getOffering(offeringKey)` / `offerings["key"]`, and `offering(id)` (server id).
+Every `AppActorOffering` has `offeringKey`. `AppActor.getOffering("onboarding")`
+fetches and looks up in one call (also on `AppActorBridge` and
+`AppActorJava.getOfferingAsync`).
 
 ## Purchase
 
@@ -142,13 +149,22 @@ AppActor.onReceiptPipelineEvent = { event -> ... }
 val configs = AppActor.getRemoteConfigs()
 val showTrial = AppActor.getRemoteConfigBool("show_trial")     // Boolean?
 val headline = AppActor.getRemoteConfigString("paywall_headline")
-val assignment = AppActor.getExperimentAssignment("paywall_test")
+
+val paywall = AppActor.getExperiment("paywall_test")
+if (paywall.isVariant("annual_first")) { /* … */ }
+val showTrial = AppActor.getExperiment("trial_test").boolValue(defaultValue = false)
+val title = AppActor.getExperiment("copy_test")["title"]?.stringValue ?: "Welcome"
 ```
 
-The typed getters (`getRemoteConfigBool/String/Number/Int`) are non-suspending
-reads over the synced snapshot and return `null` when the key is missing or the
-type does not match — always supply your own default. A `null` assignment means
-the customer is not in the experiment; render control.
+The remote-config typed getters (`getRemoteConfigBool/String/Number/Int`) are
+non-suspending reads over the synced snapshot and return `null` when the key is
+missing or the type does not match — always supply your own default.
+
+`getExperiment` never returns `null`. When the customer is not in the experiment
+`isEnrolled` is `false`, `variantKey` is `null`, and every typed getter
+(`boolValue / stringValue / intValue / doubleValue(defaultValue)`, `["key"]`)
+returns its default — render control, do not retry. `getExperimentAssignment`
+is the raw nullable underneath (`getExperiment(...).assignment`).
 
 ## Errors
 
@@ -214,8 +230,9 @@ Attribution: `updateAttribution`, `setMediaSource`, `setCampaign`, `setAdGroup`,
 
 `AppActorJava` mirrors the suspend API with `@JvmStatic` `...Async` methods that
 take callbacks: `configureAsync`, `logInAsync`, `logOutAsync`,
-`getOfferingsAsync`, `getCustomerInfoAsync`, `getRemoteConfigsAsync`,
-`getExperimentAssignmentAsync`, `getStorefrontAsync`,
+`getOfferingsAsync`, `getOfferingAsync`, `getCustomerInfoAsync`,
+`getRemoteConfigsAsync`, `getExperimentAsync`, `getExperimentAssignmentAsync`,
+`getStorefrontAsync`,
 `getStoreCapabilitiesAsync`, `purchaseAsync`.
 
 ## Related

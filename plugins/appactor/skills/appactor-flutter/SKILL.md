@@ -81,11 +81,14 @@ hammer, not a per-user operation.
 final offerings = await AppActor.instance.getOfferings();
 final offering = offerings.current;                 // AppActorOffering?
 final monthly = offering?.packageFor(AppActorPackageType.monthly);
+final onboarding = offerings['onboarding'];         // by offeringKey (the dashboard lookup key)
 ```
 
-`AppActorOfferings` gives you `current`, `all` (keyed by offering id),
-`offeringByLookupKey(...)`, and `productEntitlements`. An `AppActorOffering` has
-`packages`, `package(id)`, and `packageFor(type)`.
+`AppActorOfferings` gives you `current`, `allOfferings` (current first),
+`getOffering(offeringKey)` / `offerings['key']`, `all` (keyed by server id),
+`offering(id)`, and `productEntitlements`. An `AppActorOffering` has
+`offeringKey`, `packages`, `package(id)`, and `packageFor(type)`.
+`AppActor.instance.getOffering('onboarding')` fetches and looks up in one call.
 
 Render prices from the package, never hard-coded: `localizedPriceString` is the
 store-formatted string; `price`, `priceAmountMicros`, and `currencyCode` are
@@ -155,17 +158,24 @@ final configs = await AppActor.instance.getRemoteConfigs();
 final showTrial = await AppActor.instance.getRemoteConfigBool('show_trial');
 final headline = await AppActor.instance.getRemoteConfigString('paywall_headline');
 
-final assignment =
-    await AppActor.instance.getExperimentAssignment('paywall_test');
-if (assignment != null) {
-  // assignment.variantKey, assignment.payload, assignment.valueType
-}
+final paywall = await AppActor.instance.getExperiment('paywall_test');
+if (paywall.isVariant('annual_first')) { /* … */ }
+final showTrial = (await AppActor.instance.getExperiment('trial_test'))
+    .boolValue(defaultValue: false);
+final title = (await AppActor.instance.getExperiment('copy_test'))['title']
+    as String? ?? 'Welcome';
 ```
 
-Typed accessors (`getRemoteConfigBool/String/Number/Int`) return `null` when the
-key is missing or the stored type does not match — always supply your own
-default. `getCachedRemoteConfigs()` reads the last synced values without a
-network call.
+Remote-config typed accessors (`getRemoteConfigBool/String/Number/Int`) return
+`null` when the key is missing or the stored type does not match — always
+supply your own default. `getCachedRemoteConfigs()` reads the last synced
+values without a network call.
+
+`getExperiment` never returns `null`. When the customer is not in the experiment
+`isEnrolled` is `false`, `variantKey` is `null`, and every typed getter
+(`boolValue / stringValue / intValue / doubleValue(defaultValue:)`,
+`experiment['key']`) returns its default — render control, do not retry.
+`getExperimentAssignment` is the raw nullable underneath (`.assignment`).
 
 ## Errors
 

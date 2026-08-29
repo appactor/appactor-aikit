@@ -98,17 +98,24 @@ mode a number came from when reporting a result.
 ### Reading an assignment in the app
 
 ```swift
-let assignment = try await AppActor.shared.getExperimentAssignment(
-    experimentKey: "paywall_headline_test"
-)
+let test = try await AppActor.shared.experiment("paywall_headline_test")
+if test.isVariant("short_copy") { /* … */ }
+let headline = test.stringValue(default: "Go premium")
 ```
 
-The assignment carries `experimentId`, `experimentKey`, `variantId`,
-`variantKey`, `payload`, `valueType`, and `assignedAt`.
+Wrappers: `getExperiment("paywall_headline_test")` on Android, Flutter, and
+React Native — same shape. The result is never null: `experimentKey`,
+`isEnrolled`, `variantKey`, `isVariant(key)`, typed
+`boolValue / stringValue / intValue / doubleValue` with a default, and `["key"]`
+(`get(key)` on React Native) for JSON payloads. The raw `assignment` underneath
+(`getExperimentAssignment` returns it directly) carries `experimentId`,
+`experimentKey`, `variantId`, `variantKey`, `payload`, `valueType`, and
+`assignedAt`.
 
-**A `null` assignment is normal**, not an error. It means the customer is not in
-the experiment — outside the traffic allocation, failing targeting, or the
-experiment is not running. Render the control experience and do not retry.
+**Not being enrolled is normal**, not an error. `isEnrolled` is `false`
+(the raw assignment is null) when the customer is outside the traffic
+allocation, fails targeting, or the experiment is not running. The typed getters
+return your default, so control renders with no extra branch — do not retry.
 
 Assignment is sticky per customer, so a customer sees one variant consistently.
 Branch on `variantKey`, or read the variant's `payload` when the variant carries

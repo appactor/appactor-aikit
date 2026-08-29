@@ -69,10 +69,13 @@ const offerings = await AppActor.instance.getOfferings();
 const offering = offerings.current;
 const annual = offering?.annual;                      // or .monthly, .weekly, .lifetime
 const custom = offering?.packageFor(AppActorPackageType.ThreeMonth);
+const onboarding = offerings.getOffering('onboarding'); // by offeringKey (the dashboard lookup key)
 ```
 
-`AppActorOfferings` also has `all`, `offeringByLookupKey(...)`,
-`productEntitlements`, and `verification`.
+`AppActorOfferings` also has `allOfferings` (current first), `getOffering(offeringKey)`,
+`all` (keyed by server id), `offering(id)`, `productEntitlements`, and
+`verification`. Every `AppActorOffering` has `offeringKey`.
+`AppActor.instance.getOffering('onboarding')` fetches and looks up in one call.
 `AppActor.instance.getCachedOfferings()` returns the last synced snapshot, and
 `setFallbackOfferings(...)` seeds a bundled catalog for a first launch with no
 network.
@@ -133,12 +136,21 @@ something went wrong at runtime.
 const configs = await AppActor.instance.getRemoteConfigs();
 const showTrial = await AppActor.instance.getRemoteConfigBool('show_trial');
 const headline = await AppActor.instance.getRemoteConfigString('paywall_headline');
-const assignment = await AppActor.instance.getExperimentAssignment('paywall_test');
+
+const paywall = await AppActor.instance.getExperiment('paywall_test');
+if (paywall.isVariant('annual_first')) { /* … */ }
+const showTrial = (await AppActor.instance.getExperiment('trial_test')).boolValue(false);
+const title = (await AppActor.instance.getExperiment('copy_test')).get('title') ?? 'Welcome';
 ```
 
-The typed getters return `null` when the key is missing or the stored type does
-not match — always supply your own default. A `null` assignment means the
-customer is not in the experiment; render control.
+The remote-config typed getters return `null` when the key is missing or the
+stored type does not match — always supply your own default.
+
+`getExperiment` never returns `null`. When the customer is not in the experiment
+`isEnrolled` is `false`, `variantKey` is `null`, and every typed getter
+(`boolValue / stringValue / intValue / doubleValue(defaultValue)`, `get(key)`)
+returns its default — render control, do not retry. `getExperimentAssignment`
+is the raw nullable underneath (`.assignment`).
 
 ## Errors
 

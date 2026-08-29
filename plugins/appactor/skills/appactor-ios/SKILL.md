@@ -72,6 +72,7 @@ let offerings = try await AppActor.shared.offerings()
 let offering = offerings.current
 let annual = offering?.annual                     // or .monthly, .weekly, .lifetime
 let custom = offering?.package(for: .threeMonth)
+let onboarding = offerings["onboarding"]          // by offeringKey (the dashboard lookup key)
 ```
 
 `offerings(fetchPolicy:)` controls freshness (`getOfferings` exists only on the
@@ -92,8 +93,11 @@ For first launch with no network, ship a fallback:
 try await AppActor.shared.setFallbackOfferings(from: bundledJSONURL)
 ```
 
-`AppActorOfferings` also exposes `all`, `offering(id:)`, `offering(lookupKey:)`,
-`productEntitlements`, and `verification`.
+`AppActorOfferings` also exposes `allOfferings` (current first), `offering(_:)` /
+the subscript (both by `offeringKey`), `offering(id:)` (server id), `all` (keyed by
+server id), `productEntitlements`, and `verification`. Every `AppActorOffering`
+has `offeringKey`. `AppActor.shared.offering("onboarding")` fetches and looks up
+in one call.
 
 ## Purchase
 
@@ -154,13 +158,17 @@ that returns as pending finishes here.
 
 ```swift
 let configs = try await AppActor.shared.getRemoteConfigs()
-let assignment = try await AppActor.shared.getExperimentAssignment(
-    experimentKey: "paywall_test"
-)
+let paywall = try await AppActor.shared.experiment("paywall_test")
+if paywall.isVariant("annual_first") { /* … */ }
+let showTrial = try await AppActor.shared.experiment("trial_test").boolValue(default: false)
+let title = try await AppActor.shared.experiment("copy_test")["title"]?.stringValue ?? "Welcome"
 ```
 
-A `nil` assignment means the customer is not in the experiment — render your
-control experience, do not retry.
+`experiment(_:)` never returns `nil`. When the customer is not in the experiment
+`isEnrolled` is `false`, `variantKey` is `nil`, and every typed getter
+(`boolValue / stringValue / intValue / doubleValue(default:)`, `["key"]`) returns
+its default — render control, do not retry. `getExperimentAssignment(experimentKey:)`
+is the raw optional underneath; `experiment(_:).assignment` is the same object.
 
 ## Errors
 
