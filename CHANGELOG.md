@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.3.3
+
+- **A product's store state now reaches the agent.** `manage_products` responses
+  carry `storeState` (what App Store Connect or Google Play says, in the store's
+  own words) and `storeStateSyncedAt`, alongside the same fields `get_catalog`
+  already returned for `view: "products"`. Importing a product into AppActor
+  does not make the store sell it — Apple still has to approve it — and until
+  now an agent had no way to tell an `APPROVED` product from a
+  `WAITING_FOR_REVIEW` one and would report a paywall as ready. The
+  paywalls-and-offerings skill explains the two fields and what the states mean.
+  Both are optional in the schema, so the server accepts an API deployed before
+  or after this change.
+
 ## 0.3.2
 
 - **SDK skills teach the new offerings and experiments API.** The iOS, Android,

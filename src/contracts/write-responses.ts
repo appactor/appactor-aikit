@@ -15,6 +15,13 @@ const ProductSchema = z
 		googleBasePlanId: z.string().nullable(),
 		googleOfferId: z.string().nullable(),
 		displayName: z.string().nullable(),
+		// Whether the store will actually sell this product, as the store spells it
+		// (App Store Connect's InAppPurchaseState / Subscription.State, Google Play's
+		// base-plan / offer / one-time state), and when that answer was last read.
+		// Both null means never synced, which is not the same as "the store did not
+		// say". Optional so this schema also accepts an API that predates the fields.
+		storeState: z.string().nullable().optional(),
+		storeStateSyncedAt: DateTime.nullable().optional(),
 		createdAt: DateTime,
 		updatedAt: DateTime,
 	})

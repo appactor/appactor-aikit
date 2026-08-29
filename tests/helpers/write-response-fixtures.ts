@@ -17,6 +17,8 @@ export const product = {
 	googleBasePlanId: null,
 	googleOfferId: null,
 	displayName: 'Premium Monthly',
+	storeState: 'APPROVED',
+	storeStateSyncedAt: timestamp,
 	createdAt: timestamp,
 	updatedAt: timestamp,
 }
