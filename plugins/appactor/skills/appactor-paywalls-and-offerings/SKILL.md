@@ -64,6 +64,34 @@ Because the paywall is driven by the offering, changing which plans you sell, or
 their order, is a dashboard change and not an app release. That only holds if
 you avoid hard-coded product IDs in the client.
 
+## A product can exist here and still not be sellable
+
+Importing a product into AppActor does not make the store sell it. Apple has to
+approve it, and either store can have it pulled from sale afterwards. A product
+in that state sits in the catalog looking normal, gets attached to entitlements,
+gets put in a package — and then every purchase of it fails.
+
+`get_catalog` with `view: "products"`, and the products returned by
+`manage_products`, carry two fields for this:
+
+- `storeState` — what the store says, in the store's own words, normalized to
+  SCREAMING_SNAKE. Apple: `APPROVED`, `WAITING_FOR_REVIEW`, `MISSING_METADATA`,
+  `REJECTED`, `DEVELOPER_REMOVED_FROM_SALE`, … Google: `ACTIVE`, `DRAFT`,
+  `INACTIVE`, … There is no AppActor vocabulary on top: the two stores have
+  different lifecycles, and a mapping made here would be frozen into every row.
+- `storeStateSyncedAt` — when that was last read from the store.
+
+`null` in both means the product has never been synced, which is not the same
+answer as "the store did not say". A stale `storeStateSyncedAt` means the badge
+is old, not that the product changed.
+
+`manage_products` already refuses to import a product the store will not sell,
+and `discover` does not offer one, so the states you see on an imported product
+are the ones a live product can be in — `WAITING_FOR_REVIEW` and
+`MISSING_METADATA` are the two that matter, because both mean "not sellable
+yet". Say so when you report an import; do not tell someone their paywall is
+ready when Apple has not approved the product behind it.
+
 ## Choosing lookup keys
 
 `lookupKey` is what your code compares against, so it is effectively public API
