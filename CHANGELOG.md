@@ -1,5 +1,23 @@
 # Changelog
 
+## 0.3.4
+
+- **A package can be named, and the agent can name it.** `manage_packages`
+  accepts `lookupKey` on `create` and `update` (send `null` to clear it), and
+  every package response carries it. The name is unique inside its offering, so
+  it is how a client picks one specific package — `packageType` cannot do that
+  job, since one offering can hold six `custom` token packs that all report the
+  same type. The paywalls-and-offerings skill explains when to read the key and
+  when to fall back to type, and that the key never sets the type: `$rc_annual`
+  is just a name here, and no prefix is reserved.
+- **The response schema no longer fails closed on it.** `PackageSchema` is
+  `.strict()`, so the moment the API started returning `lookup_key` every
+  `manage_packages` create and update would have come back as a 502
+  `UPSTREAM_CONTRACT_INVALID` — telling the caller a write failed that the API
+  had already committed, with a retry on the same idempotency key failing
+  identically. The field is optional, so this server accepts an API deployed
+  before or after the matching change (`appactor-api` #527).
+
 ## 0.3.3
 
 - **A product's store state now reaches the agent.** `manage_products` responses

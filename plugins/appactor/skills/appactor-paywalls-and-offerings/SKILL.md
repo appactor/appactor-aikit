@@ -52,8 +52,9 @@ always what is missing — check that first.
 
 1. Fetch offerings and take `current` — `getOfferings()` on Flutter and React
    Native, `offerings()` on iOS and Android.
-2. Read the packages you support by type (`annual`, `monthly`, `lifetime`) —
-   never by hard-coded product ID.
+2. Read the packages you support by key when they have one, otherwise by type
+   (`annual`, `monthly`, `lifetime`) — never by hard-coded product ID. See
+   below for which to use.
 3. Render `localizedPriceString` from the package. It is already formatted for
    the customer's storefront. Do not format `price` yourself, and never
    hard-code currency symbols.
@@ -63,6 +64,38 @@ always what is missing — check that first.
 Because the paywall is driven by the offering, changing which plans you sell, or
 their order, is a dashboard change and not an app release. That only holds if
 you avoid hard-coded product IDs in the client.
+
+## Type tells you what a package is; the key tells you which one
+
+`packageType` is a cadence — `annual`, `weekly`, `custom` and five others. It is
+not unique inside an offering, and for anything sold outside a subscription
+cadence it says almost nothing: six token packs of 10/30/75/150/300/600 credits
+are six packages that all say `custom`. Reading by type finds one of them
+arbitrarily.
+
+`lookupKey` is the name someone gave the package inside its offering — `annual`,
+`pro_monthly`, `credits_300`. It is unique there, so it is what a client should
+match on when it needs a specific package, and what a screen document names when
+it draws one card rather than iterating the offering.
+
+It is optional, and older packages have none:
+
+- `null` means nobody has named it. The package is still sold and still drawn;
+  it just cannot be addressed by name. Fall back to type and position.
+- Set one with `manage_packages` (`create` or `update`), and clear it by sending
+  `lookupKey: null`.
+- The accepted spelling is letters, digits, `.`, `_`, `-` and `$`, starting with
+  a letter, digit or `$`. No spaces — `Weekly Plan` is rejected. That is the same
+  rule a screen document uses, so a key that is accepted here is one a screen can
+  write down.
+- It does **not** set the type. `$rc_annual` is a legal name and still leaves
+  `packageType` exactly as it was chosen; nothing is derived from the key, and no
+  prefix is reserved.
+- Two packages in one offering cannot share a key (409). Two different offerings
+  can each have an `annual`.
+
+`displayName` is not a substitute: it is the label shown to a customer, it is
+meant to change, and it holds spaces and emoji.
 
 ## A product can exist here and still not be sellable
 

@@ -46,6 +46,7 @@ export const pkg = {
 	id: ids.resource,
 	offeringId: ids.secondary,
 	packageType: 'monthly',
+	lookupKey: 'pro_monthly',
 	displayName: 'Monthly',
 	position: 0,
 	isActive: true,
