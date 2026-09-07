@@ -55,6 +55,15 @@ const PackageSchema = z
 		id: Id,
 		offeringId: Id,
 		packageType: z.string(),
+		// The author's name for this package inside its offering -- `annual`,
+		// `credits_300` -- unique there, and null while nobody has named it. It is
+		// how a screen document or SDK code addresses one package without a uuid;
+		// packageType cannot do that job, since one offering can hold six `custom`
+		// packs. Optional so this schema also accepts an API that predates the
+		// field: without it, `.strict()` rejects every package response the moment
+		// the API ships the column, and the caller is told a write failed that
+		// actually succeeded.
+		lookupKey: z.string().nullable().optional(),
 		displayName: z.string(),
 		position: Count,
 		isActive: z.boolean(),

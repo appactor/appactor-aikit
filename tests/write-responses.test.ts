@@ -131,6 +131,24 @@ describe('MCP controlled write responses', () => {
 		}
 	})
 
+	test('takes a package response whose lookupKey is null or absent', () => {
+		// The field is additive on the API side, so this schema has to accept three
+		// shapes: a named package, one nobody has named (null), and an API that
+		// predates the field. `.strict()` made the last two a 502
+		// UPSTREAM_CONTRACT_INVALID -- reported to the caller as a failed write, for
+		// a write the API had already committed. The named shape is the `pkg`
+		// fixture, already parsed by the action test above; `create` and `update`
+		// share one PackageSchema, so one action covers both.
+		const { lookupKey: _named, ...unnamedPkg } = pkg
+		for (const shape of [{ ...pkg, lookupKey: null }, unnamedPkg]) {
+			expect(
+				ManagePackagesResponseSchema.safeParse(
+					succeeded('create', { package: shape }),
+				).success,
+			).toBe(true)
+		}
+	})
+
 	test('fails closed on secret-bearing or unexpected upstream fields', () => {
 		const unsafeResponses = [
 			[
