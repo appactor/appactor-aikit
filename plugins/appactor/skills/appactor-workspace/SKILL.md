@@ -54,6 +54,16 @@ organization-wide dashboard audit log, so do not present it as one.
 Apple's refund requests. It needs the `refunds:read` scope rather than
 `workspace:read`. See `appactor-refund-saver`.
 
+### Apple Ads (Search Ads)
+
+`get_apple_ads_accounts` lists authorized Apple Ads ad accounts.
+`get_apple_ads_apps` lists owned apps on Apple Ads (adamId, name, developer).
+`get_apple_ads_reports` fetches performance reports across campaigns, ad groups, keywords, and search terms (`spend`, `impressions`, `taps`, `installs`, `cpa`, `cpt`).
+`get_apple_ads_campaigns` & `manage_apple_ads_campaigns` manage campaigns (create, update, pause, resume, delete).
+`get_apple_ads_adgroups` & `manage_apple_ads_adgroups` manage ad groups (create, update bid, pause, resume, delete).
+`get_apple_ads_keywords` & `manage_apple_ads_keywords` manage targeting keywords (create, update bid, pause, resume, delete).
+`get_apple_ads_negative_keywords` & `manage_apple_ads_negative_keywords` manage negative keywords (create, delete).
+
 Every read is scoped by the caller's AppActor permissions, so an empty result
 can mean "no data" *or* "no access to that project" — say which you checked
 rather than reporting zero revenue as fact.

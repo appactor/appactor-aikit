@@ -52,6 +52,17 @@ export const TOOL_SCOPES: Record<string, McpScope> = {
 	manage_refund_saver: 'refunds:write',
 	delete_project: 'workspace:delete',
 	delete_app: 'workspace:delete',
+	get_apple_ads_accounts: 'workspace:read',
+	get_apple_ads_apps: 'workspace:read',
+	get_apple_ads_reports: 'analytics:read',
+	get_apple_ads_campaigns: 'workspace:read',
+	manage_apple_ads_campaigns: 'workspace:write',
+	get_apple_ads_adgroups: 'workspace:read',
+	manage_apple_ads_adgroups: 'workspace:write',
+	get_apple_ads_keywords: 'workspace:read',
+	manage_apple_ads_keywords: 'workspace:write',
+	get_apple_ads_negative_keywords: 'workspace:read',
+	manage_apple_ads_negative_keywords: 'workspace:write',
 }
 
 export function requiredScopeForRequest(request: Request): McpScope {

@@ -14,6 +14,7 @@ import {
 	requirePrincipal,
 	successResult,
 } from './tool-runtime'
+import { registerAppleAdsTools } from './tools/apple-ads'
 import { registerCatalogWriteTools } from './tools/catalog-writes'
 import { registerConfigTools } from './tools/config-tools'
 import { registerRefundTools } from './tools/refunds'
@@ -180,6 +181,7 @@ export function createAppActorMcpServer(
 	registerCatalogWriteTools(server, api, authInfo)
 	registerWorkspaceWriteTools(server, api, authInfo)
 	registerRefundTools(server, api, authInfo)
+	registerAppleAdsTools(server, api, authInfo)
 
 	return server
 }

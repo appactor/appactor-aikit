@@ -9,6 +9,39 @@ import {
 	WorkspaceSchema,
 } from './contracts'
 import {
+	type AppleAdsReportRequest,
+	AppleAdsReportRequestSchema,
+	AppleAdsReportResponseSchema,
+	type GetAppleAdsAdGroupsRequest,
+	GetAppleAdsAdGroupsRequestSchema,
+	GetAppleAdsAdGroupsResponseSchema,
+	type GetAppleAdsCampaignsRequest,
+	GetAppleAdsCampaignsRequestSchema,
+	GetAppleAdsCampaignsResponseSchema,
+	type GetAppleAdsKeywordsRequest,
+	GetAppleAdsKeywordsRequestSchema,
+	GetAppleAdsKeywordsResponseSchema,
+	type GetAppleAdsNegativeKeywordsRequest,
+	GetAppleAdsNegativeKeywordsRequestSchema,
+	GetAppleAdsNegativeKeywordsResponseSchema,
+	type ListAppleAdsAccountsRequestSchema,
+	ListAppleAdsAccountsResponseSchema,
+	type ListAppleAdsAppsRequestSchema,
+	ListAppleAdsAppsResponseSchema,
+	type ManageAppleAdsAdGroupRequest,
+	ManageAppleAdsAdGroupRequestSchema,
+	ManageAppleAdsAdGroupResponseSchema,
+	type ManageAppleAdsCampaignRequest,
+	ManageAppleAdsCampaignRequestSchema,
+	ManageAppleAdsCampaignResponseSchema,
+	type ManageAppleAdsKeywordRequest,
+	ManageAppleAdsKeywordRequestSchema,
+	ManageAppleAdsKeywordResponseSchema,
+	type ManageAppleAdsNegativeKeywordRequest,
+	ManageAppleAdsNegativeKeywordRequestSchema,
+	ManageAppleAdsNegativeKeywordResponseSchema,
+} from './contracts/apple-ads'
+import {
 	type AuditRequest,
 	AuditRequestSchema,
 	AuditResponseSchema,
@@ -438,6 +471,224 @@ export class AppActorApiClient {
 			request,
 			ManageRefundSaverRequestSchema,
 			ManageRefundSaverResponseSchema,
+		)
+	}
+
+	getAppleAdsAccounts(
+		auth: InternalToolPrincipal,
+		options: {
+			profile?: string
+			connectionId?: string
+			organizationId?: string
+		} = {},
+	) {
+		const query = new URLSearchParams()
+		if (options.profile) query.set('profile', options.profile)
+		if (options.connectionId) query.set('connectionId', options.connectionId)
+		if (options.organizationId)
+			query.set('organizationId', options.organizationId)
+		const suffix = query.size ? `?${query}` : ''
+		return this.request(
+			'GET',
+			`/v1/internal/mcp/apple-ads/accounts${suffix}`,
+			auth,
+			undefined,
+			ListAppleAdsAccountsResponseSchema,
+		)
+	}
+
+	getAppleAdsApps(
+		auth: InternalToolPrincipal,
+		options: {
+			profile?: string
+			connectionId?: string
+			organizationId?: string
+		} = {},
+	) {
+		const query = new URLSearchParams()
+		if (options.profile) query.set('profile', options.profile)
+		if (options.connectionId) query.set('connectionId', options.connectionId)
+		if (options.organizationId)
+			query.set('organizationId', options.organizationId)
+		const suffix = query.size ? `?${query}` : ''
+		return this.request(
+			'GET',
+			`/v1/internal/mcp/apple-ads/apps${suffix}`,
+			auth,
+			undefined,
+			ListAppleAdsAppsResponseSchema,
+		)
+	}
+
+	async getAppleAdsReports(
+		auth: InternalToolPrincipal,
+		request: AppleAdsReportRequest,
+	) {
+		const res = await this.postValidated(
+			'/v1/internal/mcp/apple-ads/reports',
+			auth,
+			request,
+			AppleAdsReportRequestSchema,
+			AppleAdsReportResponseSchema,
+		)
+		const rows =
+			res.rows && res.rows.length > 0 ? res.rows : (res.reports ?? [])
+		const reports = res.reports && res.reports.length > 0 ? res.reports : rows
+		return {
+			...res,
+			rows,
+			reports,
+			selector: res.selector || res.entityType || 'campaign',
+		}
+	}
+
+	getAppleAdsCampaigns(
+		auth: InternalToolPrincipal,
+		request: GetAppleAdsCampaignsRequest = {},
+	) {
+		const query = new URLSearchParams()
+		if (request.campaignId) query.set('campaignId', String(request.campaignId))
+		if (request.status) query.set('status', request.status)
+		if (request.limit !== undefined) query.set('limit', String(request.limit))
+		if (request.offset !== undefined)
+			query.set('offset', String(request.offset))
+		if (request.profile) query.set('profile', request.profile)
+		if (request.connectionId) query.set('connectionId', request.connectionId)
+		if (request.organizationId)
+			query.set('organizationId', request.organizationId)
+		const suffix = query.size ? `?${query}` : ''
+		return this.request(
+			'GET',
+			`/v1/internal/mcp/apple-ads/campaigns${suffix}`,
+			auth,
+			undefined,
+			GetAppleAdsCampaignsResponseSchema,
+		)
+	}
+
+	manageAppleAdsCampaigns(
+		auth: InternalToolPrincipal,
+		request: ManageAppleAdsCampaignRequest,
+	) {
+		return this.postValidated(
+			'/v1/internal/mcp/apple-ads/campaigns',
+			auth,
+			request,
+			ManageAppleAdsCampaignRequestSchema,
+			ManageAppleAdsCampaignResponseSchema,
+		)
+	}
+
+	getAppleAdsAdGroups(
+		auth: InternalToolPrincipal,
+		request: GetAppleAdsAdGroupsRequest = {},
+	) {
+		const query = new URLSearchParams()
+		if (request.adGroupId) query.set('adGroupId', String(request.adGroupId))
+		if (request.campaignId) query.set('campaignId', String(request.campaignId))
+		if (request.status) query.set('status', request.status)
+		if (request.limit !== undefined) query.set('limit', String(request.limit))
+		if (request.offset !== undefined)
+			query.set('offset', String(request.offset))
+		if (request.profile) query.set('profile', request.profile)
+		if (request.connectionId) query.set('connectionId', request.connectionId)
+		if (request.organizationId)
+			query.set('organizationId', request.organizationId)
+		const suffix = query.size ? `?${query}` : ''
+		return this.request(
+			'GET',
+			`/v1/internal/mcp/apple-ads/adgroups${suffix}`,
+			auth,
+			undefined,
+			GetAppleAdsAdGroupsResponseSchema,
+		)
+	}
+
+	manageAppleAdsAdGroups(
+		auth: InternalToolPrincipal,
+		request: ManageAppleAdsAdGroupRequest,
+	) {
+		return this.postValidated(
+			'/v1/internal/mcp/apple-ads/adgroups',
+			auth,
+			request,
+			ManageAppleAdsAdGroupRequestSchema,
+			ManageAppleAdsAdGroupResponseSchema,
+		)
+	}
+
+	getAppleAdsKeywords(
+		auth: InternalToolPrincipal,
+		request: GetAppleAdsKeywordsRequest,
+	) {
+		const query = new URLSearchParams()
+		if (request.keywordId) query.set('keywordId', String(request.keywordId))
+		if (request.adGroupId) query.set('adGroupId', String(request.adGroupId))
+		if (request.status) query.set('status', request.status)
+		if (request.limit !== undefined) query.set('limit', String(request.limit))
+		if (request.offset !== undefined)
+			query.set('offset', String(request.offset))
+		if (request.profile) query.set('profile', request.profile)
+		if (request.connectionId) query.set('connectionId', request.connectionId)
+		if (request.organizationId)
+			query.set('organizationId', request.organizationId)
+		const suffix = query.size ? `?${query}` : ''
+		return this.request(
+			'GET',
+			`/v1/internal/mcp/apple-ads/keywords${suffix}`,
+			auth,
+			undefined,
+			GetAppleAdsKeywordsResponseSchema,
+		)
+	}
+
+	manageAppleAdsKeywords(
+		auth: InternalToolPrincipal,
+		request: ManageAppleAdsKeywordRequest,
+	) {
+		return this.postValidated(
+			'/v1/internal/mcp/apple-ads/keywords',
+			auth,
+			request,
+			ManageAppleAdsKeywordRequestSchema,
+			ManageAppleAdsKeywordResponseSchema,
+		)
+	}
+
+	getAppleAdsNegativeKeywords(
+		auth: InternalToolPrincipal,
+		request: GetAppleAdsNegativeKeywordsRequest = {},
+	) {
+		const query = new URLSearchParams()
+		if (request.campaignId) query.set('campaignId', String(request.campaignId))
+		if (request.adGroupId) query.set('adGroupId', String(request.adGroupId))
+		if (request.limit !== undefined) query.set('limit', String(request.limit))
+		if (request.offset !== undefined)
+			query.set('offset', String(request.offset))
+		if (request.profile) query.set('profile', request.profile)
+		if (request.connectionId) query.set('connectionId', request.connectionId)
+		if (request.organizationId)
+			query.set('organizationId', request.organizationId)
+		const suffix = query.size ? `?${query}` : ''
+		return this.request(
+			'GET',
+			`/v1/internal/mcp/apple-ads/negative-keywords${suffix}`,
+			auth,
+			undefined,
+			GetAppleAdsNegativeKeywordsResponseSchema,
+		)
+	}
+
+	manageAppleAdsNegativeKeywords(
+		auth: InternalToolPrincipal,
+		request: ManageAppleAdsNegativeKeywordRequest,
+	) {
+		return this.postValidated(
+			'/v1/internal/mcp/apple-ads/negative-keywords',
+			auth,
+			request,
+			ManageAppleAdsNegativeKeywordRequestSchema,
+			ManageAppleAdsNegativeKeywordResponseSchema,
 		)
 	}
 }

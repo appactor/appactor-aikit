@@ -328,3 +328,5 @@ export const CatalogRequestSchema = z.discriminatedUnion('view', [
 
 export type AnalyticsRequest = z.infer<typeof AnalyticsRequestSchema>
 export type CatalogRequest = z.infer<typeof CatalogRequestSchema>
+
+export * from './contracts/apple-ads'

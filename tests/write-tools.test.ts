@@ -179,6 +179,17 @@ describe('MCP controlled write tools', () => {
 			'delete_app',
 			'get_refund_saver',
 			'manage_refund_saver',
+			'get_apple_ads_accounts',
+			'get_apple_ads_apps',
+			'get_apple_ads_reports',
+			'get_apple_ads_campaigns',
+			'manage_apple_ads_campaigns',
+			'get_apple_ads_adgroups',
+			'manage_apple_ads_adgroups',
+			'get_apple_ads_keywords',
+			'manage_apple_ads_keywords',
+			'get_apple_ads_negative_keywords',
+			'manage_apple_ads_negative_keywords',
 		])
 		const expectedAnnotations = {
 			manage_products: { destructiveHint: true, openWorldHint: true },
@@ -193,7 +204,18 @@ describe('MCP controlled write tools', () => {
 			// The write never leaves AppActor -- Apple is consulted later, when a refund request
 			// actually arrives -- but it overwrites a policy that decides where money goes.
 			manage_refund_saver: { destructiveHint: true, openWorldHint: false },
+			manage_apple_ads_campaigns: {
+				destructiveHint: true,
+				openWorldHint: true,
+			},
+			manage_apple_ads_adgroups: { destructiveHint: true, openWorldHint: true },
+			manage_apple_ads_keywords: { destructiveHint: true, openWorldHint: true },
+			manage_apple_ads_negative_keywords: {
+				destructiveHint: true,
+				openWorldHint: true,
+			},
 		}
+
 		for (const [name, expected] of Object.entries(expectedAnnotations)) {
 			expect(
 				tools.find((tool) => tool.name === name)?.annotations,

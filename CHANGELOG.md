@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.4.0
+
+- **Apple Ads Management and Reporting Suite.** Added 11 new MCP tools for managing Apple Search Ads directly from AI coding assistants:
+  - `get_apple_ads_accounts`: List authorized Apple Ads ad accounts.
+  - `get_apple_ads_apps`: List owned apps on Apple Ads with Adam IDs.
+  - `get_apple_ads_reports`: Granular performance reporting (impressions, taps, spend, installs, CPT, CPA) for campaigns, ad groups, keywords, and search terms.
+  - `get_apple_ads_campaigns` & `manage_apple_ads_campaigns`: Full campaign lifecycle (list, detail, create, update, pause, resume, delete) with daily budget safety guardrails.
+  - `get_apple_ads_adgroups` & `manage_apple_ads_adgroups`: Full ad group lifecycle (list, detail, create, update bids, pause, resume, delete).
+  - `get_apple_ads_keywords` & `manage_apple_ads_keywords`: Targeting keywords lifecycle (list, add, update bid, pause, resume, delete).
+  - `get_apple_ads_negative_keywords` & `manage_apple_ads_negative_keywords`: Campaign and ad group negative keywords lifecycle.
+  - All write mutations require `workspace:write` and enforce idempotency keys; read operations are strictly scoped under `workspace:read` and `analytics:read`.
+
 ## 0.3.4
 
 - **A package can be named, and the agent can name it.** `manage_packages`
