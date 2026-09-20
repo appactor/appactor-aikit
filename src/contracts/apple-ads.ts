@@ -350,7 +350,7 @@ export const GetAppleAdsKeywordsRequestSchema = AppleAdsSelectorSchema.extend({
 	adGroupId: EntityId.describe(
 		'AdGroup ID to list keywords for (required by Apple Ads API).',
 	),
-	status: z.enum(['ACTIVE', 'PAUSED']).optional(),
+	status: z.enum(['ACTIVE', 'ENABLED', 'PAUSED']).optional(),
 	limit: z.number().int().min(1).max(1000).default(50),
 	offset: z.number().int().min(0).default(0),
 })
@@ -377,7 +377,7 @@ export const ManageAppleAdsKeywordRequestSchema = z.discriminatedUnion(
 			bid: z.number().positive(),
 			matchType: MatchTypeEnum.default('EXACT'),
 			currency: z.string().length(3).default('USD'),
-			status: z.enum(['ACTIVE', 'PAUSED']).default('ACTIVE'),
+			status: z.enum(['ACTIVE', 'ENABLED', 'PAUSED']).default('ACTIVE'),
 		}),
 		AppleAdsSelectorSchema.extend({
 			action: z.literal('update_bid'),
