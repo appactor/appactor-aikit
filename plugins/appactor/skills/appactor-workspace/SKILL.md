@@ -73,7 +73,8 @@ rather than reporting zero revenue as fact.
 Write tools: `manage_products`, `manage_entitlements`, `manage_offerings`,
 `manage_packages`, `create_project`, `create_app`, `update_app`,
 `delete_project`, `delete_app`, `manage_remote_config`, `manage_experiments`,
-`manage_refund_saver`.
+`manage_refund_saver`, `manage_apple_ads_campaigns`, `manage_apple_ads_adgroups`,
+`manage_apple_ads_keywords`, `manage_apple_ads_negative_keywords`.
 
 **Almost every mutation takes a client-generated `idempotencyKey`.** The
 exceptions are `manage_products` `discover`, `manage_offerings`
