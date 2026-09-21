@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.5.2
+
+- **No bid or budget ceiling.** The API no longer refuses bids above 10 or
+  daily budgets above 500; `appactor:asa` drops the paragraph that told the
+  agent to stop at the guard. Requires `appactor-final-api` #574.
+
 ## 0.5.1
 
 - **The Apple Ads tools work without a connection id.** Every `*_apple_ads_*`

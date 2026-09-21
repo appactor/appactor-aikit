@@ -99,13 +99,6 @@ and are safe to repeat.
 you omit is never written. It also accepts `status: "ENABLED" | "PAUSED"`,
 which is what `pause` and `resume` do.
 
-### The safety guard
-
-The API refuses a **bid above 10** or a **daily budget above 500** in the
-account's currency with a 400 that says the Apple Ads tools cannot override
-it. There is no `force` field and no retry that passes. Tell the user the
-limit and that a higher amount is set in the dashboard, and stop.
-
 ### Delete is permanent
 
 Apple does not restore a deleted campaign, ad group or keyword. Pausing is the
