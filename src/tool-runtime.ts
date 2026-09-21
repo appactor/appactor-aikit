@@ -29,11 +29,15 @@ export const READ_TOOL_ANNOTATIONS_OPEN_WORLD = {
 export function writeToolAnnotations(
 	destructiveHint: boolean,
 	openWorldHint: boolean,
+	// True for every write the API runs through its idempotency ledger. A
+	// host reads this hint to decide whether it may auto-retry, so a write
+	// the API does not replay must say false.
+	idempotentHint = true,
 ) {
 	return {
 		readOnlyHint: false,
 		destructiveHint,
-		idempotentHint: true,
+		idempotentHint,
 		openWorldHint,
 	} as const
 }

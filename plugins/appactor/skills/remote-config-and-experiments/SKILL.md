@@ -1,5 +1,5 @@
 ---
-name: appactor-remote-config-and-experiments
+name: remote-config-and-experiments
 description: Use AppActor remote config and A/B experiments — config keys and value types, targeting rules, platform overrides, experiment variants and traffic weights, primary metrics, and how to read an assignment from the SDK. Use when adding a remote-controlled value, running a paywall or pricing test, or debugging why a config value or variant assignment is not what was expected.
 ---
 
@@ -193,7 +193,7 @@ have to agree; a `json` payload decoded as a string yields nothing.
 
 ## Related
 
-Tool mechanics and idempotency rules: `appactor-workspace`. Catalog and paywall
-structure: `appactor-paywalls-and-offerings`. Platform code:
-`appactor-flutter`, `appactor-ios`, `appactor-android`,
-`appactor-react-native`.
+Tool mechanics and idempotency rules: `appactor:workspace`. Catalog and paywall
+structure: `appactor:paywalls-and-offerings`. Platform code:
+`appactor:flutter`, `appactor:ios`, `appactor:android`,
+`appactor:react-native`.

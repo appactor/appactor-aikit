@@ -1,5 +1,5 @@
 ---
-name: appactor-ios
+name: ios
 description: Integrate the AppActor iOS/Swift SDK — configure, identify users, fetch offerings, purchase with StoreKit 2, check entitlements, read remote config and experiment assignments, handle AppActorError, and use the UIKit bridge. Use when working on in-app purchases or subscriptions in a Swift/SwiftUI/UIKit app that uses AppActor, or when the user mentions AppActor with iOS or Swift.
 ---
 
@@ -249,6 +249,6 @@ instead of `async`, for Objective-C callers and cross-platform wrappers. Prefer
 
 ## Related
 
-Catalog shape and paywall structure: `appactor-paywalls-and-offerings`.
-Remote config and experiment modelling: `appactor-remote-config-and-experiments`.
-Diagnosing a customer's live state: `appactor-troubleshooting`.
+Catalog shape and paywall structure: `appactor:paywalls-and-offerings`.
+Remote config and experiment modelling: `appactor:remote-config-and-experiments`.
+Diagnosing a customer's live state: `appactor:troubleshooting`.

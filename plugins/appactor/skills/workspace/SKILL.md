@@ -1,5 +1,5 @@
 ---
-name: appactor-workspace
+name: workspace
 description: Work with an AppActor workspace through the AppActor MCP server — find organizations, projects and apps, read revenue/users/trials/experiment analytics, get SDK setup keys and store connection status, and run catalog and workspace writes safely with idempotency keys. Use when answering questions about AppActor revenue or subscribers, setting up a new app, or making catalog changes from the conversation.
 ---
 
@@ -40,7 +40,7 @@ range instead.
 
 `get_config { view, organizationId, ... }` reads remote config and experiments:
 `remote_configs`, `remote_config`, `experiments`, `experiment`. See
-`appactor-remote-config-and-experiments`.
+`appactor:remote-config-and-experiments`.
 
 `get_audit_log { organizationId, scope }` reads what AI clients already changed.
 `scope: "mine"` is the default and needs no extra permission; `"organization"`
@@ -48,21 +48,16 @@ requires `team.manage`. It covers MCP writes only — AppActor has no
 organization-wide dashboard audit log, so do not present it as one.
 
 `get_subscriber` answers questions about one named customer. See
-`appactor-troubleshooting`.
+`appactor:troubleshooting`.
 
 `get_refund_saver { organizationId, appId }` reads how one iOS app answers
 Apple's refund requests. It needs the `refunds:read` scope rather than
-`workspace:read`. See `appactor-refund-saver`.
+`workspace:read`. See `appactor:refund-saver`.
 
-### Apple Ads (Search Ads)
-
-`get_apple_ads_accounts` lists authorized Apple Ads ad accounts.
-`get_apple_ads_apps` lists owned apps on Apple Ads (adamId, name, developer).
-`get_apple_ads_reports` fetches performance reports across campaigns, ad groups, keywords, and search terms (`spend`, `impressions`, `taps`, `installs`, `cpa`, `cpt`).
-`get_apple_ads_campaigns` & `manage_apple_ads_campaigns` manage campaigns (create, update, pause, resume, delete).
-`get_apple_ads_adgroups` & `manage_apple_ads_adgroups` manage ad groups (create, update bid, pause, resume, delete).
-`get_apple_ads_keywords` & `manage_apple_ads_keywords` manage targeting keywords (create, update bid, pause, resume, delete).
-`get_apple_ads_negative_keywords` & `manage_apple_ads_negative_keywords` manage negative keywords (create, delete).
+The `get_apple_ads_*` tools read the Apple Search Ads account itself —
+campaigns, ad groups, keywords, and live performance reports — through the
+organization's Apple Ads connection. They are covered in `appactor:asa`; the
+`asa` kind of `query_analytics` above is the attribution side and stays here.
 
 Every read is scoped by the caller's AppActor permissions, so an empty result
 can mean "no data" *or* "no access to that project" — say which you checked
@@ -73,8 +68,8 @@ rather than reporting zero revenue as fact.
 Write tools: `manage_products`, `manage_entitlements`, `manage_offerings`,
 `manage_packages`, `create_project`, `create_app`, `update_app`,
 `delete_project`, `delete_app`, `manage_remote_config`, `manage_experiments`,
-`manage_refund_saver`, `manage_apple_ads_campaigns`, `manage_apple_ads_adgroups`,
-`manage_apple_ads_keywords`, `manage_apple_ads_negative_keywords`.
+`manage_refund_saver`, and the four `manage_apple_ads_*` tools (see
+`appactor:asa`).
 
 **Almost every mutation takes a client-generated `idempotencyKey`.** The
 exceptions are `manage_products` `discover`, `manage_offerings`
@@ -98,6 +93,10 @@ What a retry with the same key actually does depends on what the server recorded
 | failed | rejected — the key is burned. Fix the input and use a **new** key |
 | pending | rejected as a conflict: the operation is still in flight or was interrupted |
 | uncertain | rejected as a conflict: the outcome could not be confirmed |
+
+The four `manage_apple_ads_*` tools are the exception to this table: the API
+keeps no ledger for them, so a retry is a second call to Apple — see
+`appactor:asa`.
 
 So a plain timeout is **not** something to retry your way out of. If the server
 recorded the operation as uncertain, retrying the same key returns a conflict and
@@ -276,7 +275,7 @@ project, and app scope are three different numbers.
 
 ## Related
 
-Catalog modelling: `appactor-paywalls-and-offerings`. Customer diagnosis:
-`appactor-troubleshooting`. Config and tests:
-`appactor-remote-config-and-experiments`. Answering Apple's refund requests:
-`appactor-refund-saver`.
+Catalog modelling: `appactor:paywalls-and-offerings`. Customer diagnosis:
+`appactor:troubleshooting`. Config and tests:
+`appactor:remote-config-and-experiments`. Answering Apple's refund requests:
+`appactor:refund-saver`.

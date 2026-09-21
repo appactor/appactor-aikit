@@ -87,7 +87,9 @@ export const AppleAdsReportRequestSchema = AppleAdsSelectorSchema.extend({
 	campaignId: EntityId.optional().describe(
 		'Required for adgroup, keyword, and search_term reports.',
 	),
-	adGroupId: EntityId.optional().describe('Optional adgroup ID filter.'),
+	adGroupId: EntityId.optional().describe(
+		'Narrows a search_term report to one adgroup. Ignored by the other selectors, whose rows are always campaign-wide.',
+	),
 	days: z
 		.number()
 		.int()
@@ -122,7 +124,10 @@ export const AppleAdsReportResponseSchema = z.object({
 			totalInstalls: z.number().optional(),
 			currency: z.string().optional(),
 		})
-		.optional(),
+		.optional()
+		.describe(
+			'Totals over the rows in this response — one page of `limit` rows — not over the whole window.',
+		),
 })
 export type AppleAdsReportResponse = z.infer<
 	typeof AppleAdsReportResponseSchema

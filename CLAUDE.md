@@ -25,7 +25,7 @@ Two things ship from here, and they have nothing to do with each other at
 runtime:
 
 1. **A remote MCP server** (`src/`) deployed at `https://mcp.appactor.com/mcp`.
-   20 tools over 12 scopes.
+   31 tools over 12 scopes.
 2. **A Claude Code / Codex plugin** (`plugins/appactor/`) — skills plus an
    `.mcp.json` pointing at that hosted server. Users install the plugin; they do
    not run this code.
@@ -57,6 +57,13 @@ So a change is not finished until:
 `tests/skills.test.ts` pins the manifest, the skill list, frontmatter, and that
 every skill is reachable from another — it does **not** read skill content, so
 nothing catches a stale claim except reading the code the claim is about.
+
+Skill directories carry no `appactor-` prefix: Claude Code and Codex both load
+a plugin's skills as `<plugin>:<skill>`, so the prefix would only double up
+(`appactor:appactor-ios`). Inside a skill, refer to another one in that same
+namespaced form — `` `appactor:troubleshooting` `` — which is what the Skill
+tool takes; the test reads the namespace from `plugin.json` and rejects the old
+`` `appactor-…` `` form except for the package names it lists.
 
 ## The paired repo
 

@@ -14,7 +14,10 @@ import {
 	requirePrincipal,
 	successResult,
 } from './tool-runtime'
-import { registerAppleAdsTools } from './tools/apple-ads'
+import {
+	APPLE_ADS_NO_LEDGER_RULE,
+	registerAppleAdsTools,
+} from './tools/apple-ads'
 import { registerCatalogWriteTools } from './tools/catalog-writes'
 import { registerConfigTools } from './tools/config-tools'
 import { registerRefundTools } from './tools/refunds'
@@ -29,6 +32,7 @@ import {
 // visible delta.
 const SERVER_INSTRUCTIONS = [
 	'For every logical write, generate one idempotencyKey. If a timeout or uncertain result occurs, retry the exact same arguments with that same key; never generate a new key for the retry.',
+	`The manage_apple_ads_* tools are the exception: ${APPLE_ADS_NO_LEDGER_RULE}`,
 	'Show an offering publication preview to the user and obtain approval before apply_publish.',
 	`Deleting a project or an app is permanent: show the preview, end your turn, and ${DELETE_CONFIRMATION_RULE.charAt(0).toLowerCase()}${DELETE_CONFIRMATION_RULE.slice(1)}`,
 	'Never request store credential JSON. Store credentials and Apple Ads connections are chosen by name.',

@@ -1,5 +1,5 @@
 ---
-name: appactor-react-native
+name: react-native
 description: Integrate the AppActor React Native SDK (appactor-react-native) — configure, identify users, fetch offerings, purchase packages, check entitlements, subscribe to customer info events, read remote config and experiment assignments, and handle AppActorError. Use when working on in-app purchases or subscriptions in a React Native app that uses AppActor, or when the user mentions AppActor with React Native.
 ---
 
@@ -189,6 +189,6 @@ const info = await AppActor.instance.getCachedCustomerInfo();
 
 ## Related
 
-Catalog shape and paywall structure: `appactor-paywalls-and-offerings`.
-Remote config and experiment modelling: `appactor-remote-config-and-experiments`.
-Diagnosing a customer's live state: `appactor-troubleshooting`.
+Catalog shape and paywall structure: `appactor:paywalls-and-offerings`.
+Remote config and experiment modelling: `appactor:remote-config-and-experiments`.
+Diagnosing a customer's live state: `appactor:troubleshooting`.

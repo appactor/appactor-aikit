@@ -1,5 +1,37 @@
 # Changelog
 
+## 0.5.0
+
+- **Skills drop the `appactor-` prefix.** Claude Code and Codex both surface a
+  plugin's skills as `<plugin>:<skill>`, so `appactor-ios` loaded as
+  `appactor:appactor-ios`. The nine skills are now `workspace`,
+  `paywalls-and-offerings`, `remote-config-and-experiments`, `refund-saver`,
+  `troubleshooting`, `ios`, `android`, `flutter` and `react-native`, and
+  cross-references inside them use the namespaced form the Skill tool takes
+  (`appactor:troubleshooting`). **Anything that referenced a skill by its old
+  name — a project `CLAUDE.md`, a saved prompt — needs the new one**; the
+  package names (`appactor-react-native`, `com.appactor:appactor-android`) are
+  unchanged.
+- **`asa`: a skill for the Apple Search Ads tools.** 0.4.0 shipped eleven
+  `*_apple_ads_*` tools with nine lines inside `workspace`, whose description
+  never mentions Apple Ads — so nothing loaded when someone asked to pause a
+  campaign or read keyword spend. `appactor:asa` explains the tools as they are
+  today, including two things the API does not do yet: without a
+  `connectionId` every Apple Ads call fails in production (the MCP route never
+  resolves the organization's connection, and no read returns an id — a
+  `connectionName` selector is the intended fix), and Apple Ads writes are not
+  run through the idempotency ledger.
+- **The Apple Ads write tools stop promising a ledger the API does not keep.**
+  `idempotencyKey` is still required, and still sent, so the ledger can be added
+  on the API side without a contract change here — but the descriptions, the
+  server instructions, the `idempotentHint` annotation (now `false` for the
+  four `manage_apple_ads_*` tools, so a host does not auto-retry them) and the
+  retry advice on an uncertain outcome now all say the same thing, from one
+  constant: a re-sent `create` creates the object twice, so read the list
+  before re-sending; the state-setting actions are safe to repeat. The report
+  contract also says what the API does with `adGroupId` (search-term reports
+  only) and `summary` (a page total).
+
 ## 0.4.0
 
 - **Apple Ads Management and Reporting Suite.** Added 11 new MCP tools for managing Apple Search Ads directly from AI coding assistants:

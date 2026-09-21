@@ -55,17 +55,20 @@ behind a two-step confirmation.
 
 **Skills** that teach your agent the AppActor SDKs and product model:
 
+Skills load as `appactor:<name>` — the plugin supplies the namespace.
+
 | Skill | Covers |
 | --- | --- |
-| `appactor-workspace` | using the tools: orientation, analytics, idempotent writes, preview/apply |
-| `appactor-paywalls-and-offerings` | products, entitlements, offerings, packages, and building a paywall |
-| `appactor-remote-config-and-experiments` | config keys, targeting rules, variants, traffic weights, metrics |
-| `appactor-refund-saver` | what AppActor tells Apple when a customer asks for a refund |
-| `appactor-troubleshooting` | "paid but no access", stuck receipts, sandbox confusion, signature failures |
-| `appactor-flutter` | `appactor_flutter` |
-| `appactor-ios` | the `AppActor` Swift package |
-| `appactor-android` | `com.appactor:appactor-android` |
-| `appactor-react-native` | `appactor-react-native` |
+| `appactor:workspace` | using the tools: orientation, analytics, idempotent writes, preview/apply |
+| `appactor:paywalls-and-offerings` | products, entitlements, offerings, packages, and building a paywall |
+| `appactor:remote-config-and-experiments` | config keys, targeting rules, variants, traffic weights, metrics |
+| `appactor:refund-saver` | what AppActor tells Apple when a customer asks for a refund |
+| `appactor:asa` | Apple Search Ads: campaigns, ad groups, keywords, bids, budgets, performance reports |
+| `appactor:troubleshooting` | "paid but no access", stuck receipts, sandbox confusion, signature failures |
+| `appactor:flutter` | `appactor_flutter` |
+| `appactor:ios` | the `AppActor` Swift package |
+| `appactor:android` | `com.appactor:appactor-android` |
+| `appactor:react-native` | `appactor-react-native` |
 
 The SDK skills are written from the SDK sources, so signatures, enum cases,
 error codes, and ordering constraints match the code rather than a summary of

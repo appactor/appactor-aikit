@@ -21,6 +21,25 @@ function parseFrontmatter(source: string) {
 const skillNames = readdirSync(skillsDir).filter((entry) =>
 	statSync(join(skillsDir, entry)).isDirectory(),
 )
+const skillSources = new Map(
+	skillNames.map((name) => [
+		name,
+		readFileSync(join(skillsDir, name, 'SKILL.md'), 'utf8'),
+	]),
+)
+
+// Claude Code and Codex both load a plugin's skills as `<plugin>:<skill>`,
+// so the namespace comes from the manifest and never from a directory name.
+const namespace = (
+	JSON.parse(
+		readFileSync(join(pluginRoot, '.claude-plugin', 'plugin.json'), 'utf8'),
+	) as { name: string }
+).name
+
+// Backticked `appactor-…` strings that are package identifiers, not stale
+// skill references from before 0.5.0. (`com.appactor:appactor-android` never
+// matches: its backtick precedes the Gradle group id.)
+const PACKAGE_NAMES = new Set(['appactor-react-native'])
 
 describe('AppActor plugin', () => {
 	test('is listed in the repository marketplace manifest', () => {
@@ -59,7 +78,8 @@ describe('AppActor plugin', () => {
 			version?: string
 			author?: { name?: string }
 		}
-		expect(manifest.name).toBe('appactor')
+		expect(manifest.name).toBe(namespace)
+		expect(namespace).toBe('appactor')
 		expect(manifest.description?.length).toBeGreaterThan(20)
 		expect(manifest.version).toMatch(/^\d+\.\d+\.\d+$/)
 		expect(manifest.author?.name).toBeTruthy()
@@ -67,21 +87,22 @@ describe('AppActor plugin', () => {
 
 	test('ships every skill this plugin is meant to provide', () => {
 		expect(skillNames.sort()).toEqual([
-			'appactor-android',
-			'appactor-flutter',
-			'appactor-ios',
-			'appactor-paywalls-and-offerings',
-			'appactor-react-native',
-			'appactor-refund-saver',
-			'appactor-remote-config-and-experiments',
-			'appactor-troubleshooting',
-			'appactor-workspace',
+			'android',
+			'asa',
+			'flutter',
+			'ios',
+			'paywalls-and-offerings',
+			'react-native',
+			'refund-saver',
+			'remote-config-and-experiments',
+			'troubleshooting',
+			'workspace',
 		])
 	})
 })
 
 describe.each(skillNames)('skill %s', (skillName) => {
-	const source = readFileSync(join(skillsDir, skillName, 'SKILL.md'), 'utf8')
+	const source = skillSources.get(skillName) as string
 	const frontmatter = parseFrontmatter(source)
 
 	test('has frontmatter whose name matches its directory', () => {
@@ -103,23 +124,28 @@ describe.each(skillNames)('skill %s', (skillName) => {
 
 	test('is reachable from at least one other skill', () => {
 		// A skill nothing points at is a skill that rarely loads. This caught
-		// appactor-workspace, which carried the tool rules but was orphaned.
+		// workspace, which carried the tool rules but was orphaned.
 		const referencedElsewhere = skillNames
 			.filter((other) => other !== skillName)
 			.some((other) =>
-				readFileSync(join(skillsDir, other, 'SKILL.md'), 'utf8').includes(
-					`\`${skillName}\``,
+				(skillSources.get(other) as string).includes(
+					`\`${namespace}:${skillName}\``,
 				),
 			)
 		expect(referencedElsewhere).toBe(true)
 	})
 
-	test('only cross-references skills that exist', () => {
-		const referenced = [...source.matchAll(/`(appactor-[a-z-]+)`/g)].map(
-			(match) => match[1] as string,
-		)
-		for (const reference of new Set(referenced)) {
-			expect(skillNames).toContain(reference)
+	test('cross-references existing skills in the form the Skill tool takes', () => {
+		// `appactor:troubleshooting` is what the model invokes, so that is the
+		// form a skill writes. The pre-0.5.0 `appactor-troubleshooting` form
+		// is a stale reference unless the string is a package name.
+		const pattern = new RegExp(`\`${namespace}([:-])([a-z-]+)\``, 'g')
+		for (const [, separator, name] of source.matchAll(pattern)) {
+			if (separator === '-' && PACKAGE_NAMES.has(`${namespace}-${name}`)) {
+				continue
+			}
+			expect(separator).toBe(':')
+			expect(skillNames).toContain(name)
 		}
 	})
 })

@@ -1,5 +1,5 @@
 ---
-name: appactor-refund-saver
+name: refund-saver
 description: Configure AppActor Refund Saver — how an iOS app answers Apple when a customer asks for a refund, using the get_refund_saver and manage_refund_saver MCP tools. Use when someone asks about refund requests, refund rates, chargebacks, declining or granting refunds automatically, CONSUMPTION_REQUEST, or why AppActor is or is not responding to Apple about a refund.
 ---
 
@@ -129,6 +129,6 @@ what AppActor intends to do.
 
 ## Related
 
-Workspace tools, scopes and idempotency rules: `appactor-workspace`. Diagnosing
-one customer's purchase: `appactor-troubleshooting`. iOS SDK integration:
-`appactor-ios`.
+Workspace tools, scopes and idempotency rules: `appactor:workspace`. Diagnosing
+one customer's purchase: `appactor:troubleshooting`. iOS SDK integration:
+`appactor:ios`.

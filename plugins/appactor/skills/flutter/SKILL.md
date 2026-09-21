@@ -1,5 +1,5 @@
 ---
-name: appactor-flutter
+name: flutter
 description: Integrate the AppActor Flutter SDK (appactor_flutter) — configure, identify users, fetch offerings, purchase packages, check entitlements, read remote config and experiment assignments, and handle purchase errors. Use when working on in-app purchases or subscriptions in a Flutter app that uses AppActor, or when the user mentions AppActor with Flutter/Dart.
 ---
 
@@ -230,6 +230,6 @@ Attribution fields are `updateAttribution`, `setMediaSource`, `setCampaign`,
 
 ## Related
 
-Catalog shape and paywall structure: `appactor-paywalls-and-offerings`.
-Remote config and experiment modelling: `appactor-remote-config-and-experiments`.
-Diagnosing a customer's live state: `appactor-troubleshooting`.
+Catalog shape and paywall structure: `appactor:paywalls-and-offerings`.
+Remote config and experiment modelling: `appactor:remote-config-and-experiments`.
+Diagnosing a customer's live state: `appactor:troubleshooting`.

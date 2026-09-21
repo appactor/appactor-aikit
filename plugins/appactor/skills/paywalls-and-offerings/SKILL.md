@@ -1,6 +1,6 @@
 ---
-name: appactor-paywalls-and-offerings
-description: Model an AppActor catalog and build a paywall from it — how products, entitlements, offerings, and packages relate, what "current offering" means, package types, how to add a plan or change pricing without shipping an app update, and how to edit the catalog with the AppActor MCP tools. Use when designing a paywall, adding or renaming an entitlement, wiring a package to a product, or publishing an offering. For diagnosing one customer who already paid, use appactor-troubleshooting instead.
+name: paywalls-and-offerings
+description: Model an AppActor catalog and build a paywall from it — how products, entitlements, offerings, and packages relate, what "current offering" means, package types, how to add a plan or change pricing without shipping an app update, and how to edit the catalog with the AppActor MCP tools. Use when designing a paywall, adding or renaming an entitlement, wiring a package to a product, or publishing an offering. For diagnosing one customer who already paid, use appactor:troubleshooting instead.
 ---
 
 # AppActor — paywalls, offerings, and the catalog
@@ -196,7 +196,7 @@ catalog inside it along with everything else. `delete_app` is different and the
 difference matters here: the project's entitlements, offerings and packages
 survive an app delete, but that app's products do not, so every package loses
 its bindings for that platform and keeps standing with nothing behind them on
-that store. See `appactor-workspace` for both flows.
+that store. See `appactor:workspace` for both flows.
 
 ## When a catalog change does not take effect
 
@@ -204,11 +204,11 @@ If a purchase grants nothing, the catalog side of it is the product-to-
 entitlement link: `get_catalog` with `view: "product"` shows which entitlements a
 product grants, and an empty list there explains the symptom on its own. If the
 link is present and the customer still has no access, the question has moved off
-the catalog — diagnose the customer with `appactor-troubleshooting`.
+the catalog — diagnose the customer with `appactor:troubleshooting`.
 
 ## Related
 
 Tool mechanics, idempotency rules, and how to find organization/project IDs:
-`appactor-workspace`. Diagnosing one customer: `appactor-troubleshooting`.
-Platform code: `appactor-flutter`, `appactor-ios`, `appactor-android`,
-`appactor-react-native`.
+`appactor:workspace`. Diagnosing one customer: `appactor:troubleshooting`.
+Platform code: `appactor:flutter`, `appactor:ios`, `appactor:android`,
+`appactor:react-native`.

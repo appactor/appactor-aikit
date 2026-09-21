@@ -564,4 +564,63 @@ describe('Apple Ads MCP tools', () => {
 
 		expect(response.status).toBe(403)
 	})
+
+	// The API keeps no ledger for Apple Ads writes, so the "retry with the same
+	// key" advice errorResult attaches to an uncertain outcome is only true of
+	// the actions that set a state. A re-sent create creates the object twice.
+	describe('retry advice on an uncertain outcome', () => {
+		const upstreamDown = async () =>
+			Response.json(
+				{
+					error: { code: 'UPSTREAM_ERROR', message: 'Apple Ads unavailable.' },
+					requestId: 'req-503',
+				},
+				{ status: 503 },
+			)
+
+		async function manageCampaign(args: Record<string, unknown>) {
+			const fixture = await createMcpAppFixture(
+				upstreamDown as unknown as typeof fetch,
+			)
+			const token = await issueAccessToken(fixture, 'workspace:write')
+			const response = await mcpRpc(
+				fixture,
+				token,
+				'tools/call',
+				{
+					name: 'manage_apple_ads_campaigns',
+					arguments: args,
+					_meta: modernMeta(),
+				},
+				'manage_apple_ads_campaigns',
+			)
+			return (await response.json()).result as {
+				isError?: boolean
+				content: Array<{ text: string }>
+			}
+		}
+
+		test('is withheld from create', async () => {
+			const result = await manageCampaign({
+				action: 'create',
+				idempotencyKey: 'idem-create-503',
+				name: 'Brand US',
+				dailyBudget: 50,
+				countriesOrRegions: ['US'],
+				adamId: 123456,
+			})
+			expect(result.isError).toBe(true)
+			expect(result.content[0].text).not.toContain('same idempotencyKey')
+		})
+
+		test('is given for a state-setting action', async () => {
+			const result = await manageCampaign({
+				action: 'pause',
+				idempotencyKey: 'idem-pause-503',
+				campaignId: 101,
+			})
+			expect(result.isError).toBe(true)
+			expect(result.content[0].text).toContain('same idempotencyKey')
+		})
+	})
 })

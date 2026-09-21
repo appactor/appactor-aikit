@@ -1,5 +1,5 @@
 ---
-name: appactor-android
+name: android
 description: Integrate the AppActor Android SDK (com.appactor:appactor-android) — configure, identify users, fetch offerings, purchase through Google Play Billing, check entitlements, read remote config and experiment assignments, handle AppActorError, and call it from Java. Use when working on in-app purchases or subscriptions in an Android/Kotlin app that uses AppActor, or when the user mentions AppActor with Android or Kotlin.
 ---
 
@@ -237,6 +237,6 @@ take callbacks: `configureAsync`, `logInAsync`, `logOutAsync`,
 
 ## Related
 
-Catalog shape and paywall structure: `appactor-paywalls-and-offerings`.
-Remote config and experiment modelling: `appactor-remote-config-and-experiments`.
-Diagnosing a customer's live state: `appactor-troubleshooting`.
+Catalog shape and paywall structure: `appactor:paywalls-and-offerings`.
+Remote config and experiment modelling: `appactor:remote-config-and-experiments`.
+Diagnosing a customer's live state: `appactor:troubleshooting`.
