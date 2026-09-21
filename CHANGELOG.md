@@ -1,5 +1,21 @@
 # Changelog
 
+## 0.5.1
+
+- **The Apple Ads tools work without a connection id.** Every `*_apple_ads_*`
+  tool now takes `organizationId` (required) and an
+  optional `connectionName` — the name `get_app_setup` lists under
+  `connections.asa.available`, the same handle `update_app` takes. With one
+  connection in the organization nothing needs naming; with several the API
+  answers 400 and lists them. `connectionId` and `profile` are gone from the
+  contracts: no read ever returned an id, and the profile only ever selected a
+  developer's local file. Requires the API change that resolves the
+  organization on these routes (`appactor-final-api`, MCP Apple Ads org
+  resolution); against an older API every call still fails as 0.5.0 described.
+- **`appactor:asa` says which connection answers** in a three-row table instead
+  of telling the agent to ask the user for an id it could not have, and names
+  the `asa.manage` account permission the API now checks on all eleven tools.
+
 ## 0.5.0
 
 - **Skills drop the `appactor-` prefix.** Claude Code and Codex both surface a

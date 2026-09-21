@@ -10,6 +10,8 @@ import {
 
 afterEach(stopTestServers)
 
+const ORGANIZATION_ID = '5c6a1a4e-3f4b-4d5e-9a6b-7c8d9e0f1a2b'
+
 describe('Apple Ads MCP tools', () => {
 	test('get_apple_ads_accounts requires workspace:read and binds to correct route', async () => {
 		let internalCall: Record<string, unknown> | null = null
@@ -24,8 +26,10 @@ describe('Apple Ads MCP tools', () => {
 					audience: 'appactor-api',
 				},
 			)
+			const url = new URL(request.url)
 			internalCall = {
-				path: new URL(request.url).pathname,
+				path: url.pathname,
+				query: Object.fromEntries(url.searchParams),
 				method: request.method,
 				tool: verified.payload.tool,
 				scope: verified.payload.scope,
@@ -52,7 +56,7 @@ describe('Apple Ads MCP tools', () => {
 			'tools/call',
 			{
 				name: 'get_apple_ads_accounts',
-				arguments: { profile: 'AppMerge' },
+				arguments: { organizationId: ORGANIZATION_ID, connectionName: 'Main' },
 				_meta: modernMeta(),
 			},
 			'get_apple_ads_accounts',
@@ -66,6 +70,9 @@ describe('Apple Ads MCP tools', () => {
 		)
 		expect(internalCall).toMatchObject({
 			path: '/v1/internal/mcp/apple-ads/accounts',
+			// The API resolves membership, the consent grant and asa.manage from
+			// organizationId, and the connection by name; neither is optional here.
+			query: { organizationId: ORGANIZATION_ID, connectionName: 'Main' },
 			method: 'GET',
 			tool: 'get_apple_ads_accounts',
 			scope: 'workspace:read',
@@ -73,7 +80,9 @@ describe('Apple Ads MCP tools', () => {
 	})
 
 	test('get_apple_ads_apps requires workspace:read', async () => {
-		const fixture = await createMcpAppFixture(async () => {
+		let query: Record<string, string> | undefined
+		const fixture = await createMcpAppFixture(async (request) => {
+			query = Object.fromEntries(new URL(request.url).searchParams)
 			return Response.json({
 				data: {
 					apps: [
@@ -95,7 +104,7 @@ describe('Apple Ads MCP tools', () => {
 			'tools/call',
 			{
 				name: 'get_apple_ads_apps',
-				arguments: { profile: 'AppMerge' },
+				arguments: { organizationId: ORGANIZATION_ID },
 				_meta: modernMeta(),
 			},
 			'get_apple_ads_apps',
@@ -104,6 +113,7 @@ describe('Apple Ads MCP tools', () => {
 		expect(response.status).toBe(200)
 		const body = await response.json()
 		expect(body.result?.structuredContent?.apps[0].adamId).toBe('123456789')
+		expect(query).toEqual({ organizationId: ORGANIZATION_ID })
 	})
 
 	test('get_apple_ads_reports requires analytics:read and validates report shape', async () => {
@@ -124,6 +134,7 @@ describe('Apple Ads MCP tools', () => {
 				method: request.method,
 				tool: verified.payload.tool,
 				scope: verified.payload.scope,
+				body: await request.json(),
 			}
 			return Response.json({
 				data: {
@@ -156,7 +167,11 @@ describe('Apple Ads MCP tools', () => {
 			'tools/call',
 			{
 				name: 'get_apple_ads_reports',
-				arguments: { selector: 'campaign', days: 7 },
+				arguments: {
+					selector: 'campaign',
+					days: 7,
+					organizationId: ORGANIZATION_ID,
+				},
 				_meta: modernMeta(),
 			},
 			'get_apple_ads_reports',
@@ -171,7 +186,11 @@ describe('Apple Ads MCP tools', () => {
 			'tools/call',
 			{
 				name: 'get_apple_ads_reports',
-				arguments: { selector: 'campaign', days: 7, profile: 'AppMerge' },
+				arguments: {
+					selector: 'campaign',
+					days: 7,
+					organizationId: ORGANIZATION_ID,
+				},
 				_meta: modernMeta(),
 			},
 			'get_apple_ads_reports',
@@ -185,6 +204,7 @@ describe('Apple Ads MCP tools', () => {
 			method: 'POST',
 			tool: 'get_apple_ads_reports',
 			scope: 'analytics:read',
+			body: { selector: 'campaign', days: 7, organizationId: ORGANIZATION_ID },
 		})
 	})
 
@@ -235,6 +255,8 @@ describe('Apple Ads MCP tools', () => {
 			{
 				name: 'manage_apple_ads_campaigns',
 				arguments: {
+					organizationId: ORGANIZATION_ID,
+					connectionName: 'Main',
 					action: 'create',
 					idempotencyKey: 'idem-camp-1',
 					name: 'Test MCP Campaign',
@@ -242,7 +264,6 @@ describe('Apple Ads MCP tools', () => {
 					currency: 'USD',
 					countriesOrRegions: ['US'],
 					adamId: 123456789,
-					profile: 'AppMerge',
 				},
 				_meta: modernMeta(),
 			},
@@ -257,6 +278,7 @@ describe('Apple Ads MCP tools', () => {
 			method: 'POST',
 			tool: 'manage_apple_ads_campaigns',
 			scope: 'workspace:write',
+			body: { organizationId: ORGANIZATION_ID, connectionName: 'Main' },
 		})
 	})
 
@@ -282,6 +304,7 @@ describe('Apple Ads MCP tools', () => {
 			{
 				name: 'manage_apple_ads_adgroups',
 				arguments: {
+					organizationId: ORGANIZATION_ID,
 					action: 'pause',
 					idempotencyKey: 'idem-ag-pause',
 					adGroupId: 444333,
@@ -296,6 +319,7 @@ describe('Apple Ads MCP tools', () => {
 			action: 'pause',
 			adGroupId: 444333,
 			idempotencyKey: 'idem-ag-pause',
+			organizationId: ORGANIZATION_ID,
 		})
 	})
 
@@ -321,6 +345,7 @@ describe('Apple Ads MCP tools', () => {
 			{
 				name: 'manage_apple_ads_keywords',
 				arguments: {
+					organizationId: ORGANIZATION_ID,
 					action: 'update_bid',
 					idempotencyKey: 'idem-kw-bid',
 					keywordId: 555666,
@@ -336,6 +361,7 @@ describe('Apple Ads MCP tools', () => {
 			action: 'update_bid',
 			keywordId: 555666,
 			bid: 1.5,
+			organizationId: ORGANIZATION_ID,
 		})
 	})
 
@@ -361,6 +387,7 @@ describe('Apple Ads MCP tools', () => {
 			{
 				name: 'manage_apple_ads_negative_keywords',
 				arguments: {
+					organizationId: ORGANIZATION_ID,
 					action: 'create',
 					idempotencyKey: 'idem-neg-1',
 					campaignId: 101,
@@ -377,11 +404,14 @@ describe('Apple Ads MCP tools', () => {
 			action: 'create',
 			campaignId: 101,
 			text: 'free cheats',
+			organizationId: ORGANIZATION_ID,
 		})
 	})
 
 	test('get_apple_ads_campaigns requires workspace:read and fetches campaign list', async () => {
-		const fixture = await createMcpAppFixture(async () => {
+		let query: Record<string, string> | undefined
+		const fixture = await createMcpAppFixture(async (request) => {
+			query = Object.fromEntries(new URL(request.url).searchParams)
 			return Response.json({
 				data: {
 					campaigns: [
@@ -408,7 +438,7 @@ describe('Apple Ads MCP tools', () => {
 			'tools/call',
 			{
 				name: 'get_apple_ads_campaigns',
-				arguments: { limit: 10 },
+				arguments: { limit: 10, organizationId: ORGANIZATION_ID },
 				_meta: modernMeta(),
 			},
 			'get_apple_ads_campaigns',
@@ -419,10 +449,17 @@ describe('Apple Ads MCP tools', () => {
 			result?: { structuredContent?: { campaigns: Array<{ id: number }> } }
 		}
 		expect(body.result?.structuredContent?.campaigns[0].id).toBe(101)
+		expect(query).toEqual({
+			limit: '10',
+			offset: '0',
+			organizationId: ORGANIZATION_ID,
+		})
 	})
 
 	test('get_apple_ads_adgroups requires workspace:read and fetches adgroups', async () => {
-		const fixture = await createMcpAppFixture(async () => {
+		let query: Record<string, string> | undefined
+		const fixture = await createMcpAppFixture(async (request) => {
+			query = Object.fromEntries(new URL(request.url).searchParams)
 			return Response.json({
 				data: {
 					adGroups: [
@@ -449,7 +486,7 @@ describe('Apple Ads MCP tools', () => {
 			'tools/call',
 			{
 				name: 'get_apple_ads_adgroups',
-				arguments: { campaignId: 101 },
+				arguments: { campaignId: 101, organizationId: ORGANIZATION_ID },
 				_meta: modernMeta(),
 			},
 			'get_apple_ads_adgroups',
@@ -460,10 +497,18 @@ describe('Apple Ads MCP tools', () => {
 			result?: { structuredContent?: { adGroups: Array<{ id: number }> } }
 		}
 		expect(body.result?.structuredContent?.adGroups[0].id).toBe(201)
+		expect(query).toEqual({
+			campaignId: '101',
+			limit: '50',
+			offset: '0',
+			organizationId: ORGANIZATION_ID,
+		})
 	})
 
 	test('get_apple_ads_keywords requires workspace:read and fetches keywords', async () => {
-		const fixture = await createMcpAppFixture(async () => {
+		let query: Record<string, string> | undefined
+		const fixture = await createMcpAppFixture(async (request) => {
+			query = Object.fromEntries(new URL(request.url).searchParams)
 			return Response.json({
 				data: {
 					keywords: [
@@ -490,7 +535,7 @@ describe('Apple Ads MCP tools', () => {
 			'tools/call',
 			{
 				name: 'get_apple_ads_keywords',
-				arguments: { adGroupId: 201 },
+				arguments: { adGroupId: 201, organizationId: ORGANIZATION_ID },
 				_meta: modernMeta(),
 			},
 			'get_apple_ads_keywords',
@@ -501,10 +546,18 @@ describe('Apple Ads MCP tools', () => {
 			result?: { structuredContent?: { keywords: Array<{ id: number }> } }
 		}
 		expect(body.result?.structuredContent?.keywords[0].id).toBe(301)
+		expect(query).toEqual({
+			adGroupId: '201',
+			limit: '50',
+			offset: '0',
+			organizationId: ORGANIZATION_ID,
+		})
 	})
 
 	test('get_apple_ads_negative_keywords requires workspace:read and fetches negatives', async () => {
-		const fixture = await createMcpAppFixture(async () => {
+		let query: Record<string, string> | undefined
+		const fixture = await createMcpAppFixture(async (request) => {
+			query = Object.fromEntries(new URL(request.url).searchParams)
 			return Response.json({
 				data: {
 					negativeKeywords: [
@@ -528,7 +581,7 @@ describe('Apple Ads MCP tools', () => {
 			'tools/call',
 			{
 				name: 'get_apple_ads_negative_keywords',
-				arguments: { campaignId: 101 },
+				arguments: { campaignId: 101, organizationId: ORGANIZATION_ID },
 				_meta: modernMeta(),
 			},
 			'get_apple_ads_negative_keywords',
@@ -541,6 +594,12 @@ describe('Apple Ads MCP tools', () => {
 			}
 		}
 		expect(body.result?.structuredContent?.negativeKeywords[0].id).toBe(401)
+		expect(query).toEqual({
+			campaignId: '101',
+			limit: '50',
+			offset: '0',
+			organizationId: ORGANIZATION_ID,
+		})
 	})
 
 	test('manage_apple_ads_campaigns rejects read-only scope with 403', async () => {
@@ -553,6 +612,7 @@ describe('Apple Ads MCP tools', () => {
 			{
 				name: 'manage_apple_ads_campaigns',
 				arguments: {
+					organizationId: ORGANIZATION_ID,
 					action: 'pause',
 					idempotencyKey: 'idem-reject-1',
 					campaignId: 101,
@@ -602,6 +662,7 @@ describe('Apple Ads MCP tools', () => {
 
 		test('is withheld from create', async () => {
 			const result = await manageCampaign({
+				organizationId: ORGANIZATION_ID,
 				action: 'create',
 				idempotencyKey: 'idem-create-503',
 				name: 'Brand US',
@@ -615,6 +676,7 @@ describe('Apple Ads MCP tools', () => {
 
 		test('is given for a state-setting action', async () => {
 			const result = await manageCampaign({
+				organizationId: ORGANIZATION_ID,
 				action: 'pause',
 				idempotencyKey: 'idem-pause-503',
 				campaignId: 101,

@@ -12,6 +12,7 @@ import {
 	type AppleAdsReportRequest,
 	AppleAdsReportRequestSchema,
 	AppleAdsReportResponseSchema,
+	type AppleAdsSelector,
 	type GetAppleAdsAdGroupsRequest,
 	GetAppleAdsAdGroupsRequestSchema,
 	GetAppleAdsAdGroupsResponseSchema,
@@ -122,6 +123,18 @@ function parseRetryAfter(response: Response) {
 	if (!raw) return undefined
 	const seconds = Number(raw)
 	return Number.isFinite(seconds) && seconds >= 0 ? seconds : undefined
+}
+
+/**
+ * The organization and connection every Apple Ads GET carries. `organizationId`
+ * is what the API checks membership, the consent grant and `asa.manage`
+ * against; `connectionName` is only sent when the caller chose one.
+ */
+function appleAdsSelectorQuery(selector: AppleAdsSelector) {
+	const query = new URLSearchParams({ organizationId: selector.organizationId })
+	if (selector.connectionName)
+		query.set('connectionName', selector.connectionName)
+	return query
 }
 
 export class AppActorApiClient {
@@ -474,46 +487,22 @@ export class AppActorApiClient {
 		)
 	}
 
-	getAppleAdsAccounts(
-		auth: InternalToolPrincipal,
-		options: {
-			profile?: string
-			connectionId?: string
-			organizationId?: string
-		} = {},
-	) {
-		const query = new URLSearchParams()
-		if (options.profile) query.set('profile', options.profile)
-		if (options.connectionId) query.set('connectionId', options.connectionId)
-		if (options.organizationId)
-			query.set('organizationId', options.organizationId)
-		const suffix = query.size ? `?${query}` : ''
+	getAppleAdsAccounts(auth: InternalToolPrincipal, request: AppleAdsSelector) {
+		const query = appleAdsSelectorQuery(request)
 		return this.request(
 			'GET',
-			`/v1/internal/mcp/apple-ads/accounts${suffix}`,
+			`/v1/internal/mcp/apple-ads/accounts?${query}`,
 			auth,
 			undefined,
 			ListAppleAdsAccountsResponseSchema,
 		)
 	}
 
-	getAppleAdsApps(
-		auth: InternalToolPrincipal,
-		options: {
-			profile?: string
-			connectionId?: string
-			organizationId?: string
-		} = {},
-	) {
-		const query = new URLSearchParams()
-		if (options.profile) query.set('profile', options.profile)
-		if (options.connectionId) query.set('connectionId', options.connectionId)
-		if (options.organizationId)
-			query.set('organizationId', options.organizationId)
-		const suffix = query.size ? `?${query}` : ''
+	getAppleAdsApps(auth: InternalToolPrincipal, request: AppleAdsSelector) {
+		const query = appleAdsSelectorQuery(request)
 		return this.request(
 			'GET',
-			`/v1/internal/mcp/apple-ads/apps${suffix}`,
+			`/v1/internal/mcp/apple-ads/apps?${query}`,
 			auth,
 			undefined,
 			ListAppleAdsAppsResponseSchema,
@@ -544,22 +533,17 @@ export class AppActorApiClient {
 
 	getAppleAdsCampaigns(
 		auth: InternalToolPrincipal,
-		request: GetAppleAdsCampaignsRequest = {},
+		request: GetAppleAdsCampaignsRequest,
 	) {
-		const query = new URLSearchParams()
+		const query = appleAdsSelectorQuery(request)
 		if (request.campaignId) query.set('campaignId', String(request.campaignId))
 		if (request.status) query.set('status', request.status)
 		if (request.limit !== undefined) query.set('limit', String(request.limit))
 		if (request.offset !== undefined)
 			query.set('offset', String(request.offset))
-		if (request.profile) query.set('profile', request.profile)
-		if (request.connectionId) query.set('connectionId', request.connectionId)
-		if (request.organizationId)
-			query.set('organizationId', request.organizationId)
-		const suffix = query.size ? `?${query}` : ''
 		return this.request(
 			'GET',
-			`/v1/internal/mcp/apple-ads/campaigns${suffix}`,
+			`/v1/internal/mcp/apple-ads/campaigns?${query}`,
 			auth,
 			undefined,
 			GetAppleAdsCampaignsResponseSchema,
@@ -581,23 +565,18 @@ export class AppActorApiClient {
 
 	getAppleAdsAdGroups(
 		auth: InternalToolPrincipal,
-		request: GetAppleAdsAdGroupsRequest = {},
+		request: GetAppleAdsAdGroupsRequest,
 	) {
-		const query = new URLSearchParams()
+		const query = appleAdsSelectorQuery(request)
 		if (request.adGroupId) query.set('adGroupId', String(request.adGroupId))
 		if (request.campaignId) query.set('campaignId', String(request.campaignId))
 		if (request.status) query.set('status', request.status)
 		if (request.limit !== undefined) query.set('limit', String(request.limit))
 		if (request.offset !== undefined)
 			query.set('offset', String(request.offset))
-		if (request.profile) query.set('profile', request.profile)
-		if (request.connectionId) query.set('connectionId', request.connectionId)
-		if (request.organizationId)
-			query.set('organizationId', request.organizationId)
-		const suffix = query.size ? `?${query}` : ''
 		return this.request(
 			'GET',
-			`/v1/internal/mcp/apple-ads/adgroups${suffix}`,
+			`/v1/internal/mcp/apple-ads/adgroups?${query}`,
 			auth,
 			undefined,
 			GetAppleAdsAdGroupsResponseSchema,
@@ -621,21 +600,16 @@ export class AppActorApiClient {
 		auth: InternalToolPrincipal,
 		request: GetAppleAdsKeywordsRequest,
 	) {
-		const query = new URLSearchParams()
+		const query = appleAdsSelectorQuery(request)
 		if (request.keywordId) query.set('keywordId', String(request.keywordId))
 		if (request.adGroupId) query.set('adGroupId', String(request.adGroupId))
 		if (request.status) query.set('status', request.status)
 		if (request.limit !== undefined) query.set('limit', String(request.limit))
 		if (request.offset !== undefined)
 			query.set('offset', String(request.offset))
-		if (request.profile) query.set('profile', request.profile)
-		if (request.connectionId) query.set('connectionId', request.connectionId)
-		if (request.organizationId)
-			query.set('organizationId', request.organizationId)
-		const suffix = query.size ? `?${query}` : ''
 		return this.request(
 			'GET',
-			`/v1/internal/mcp/apple-ads/keywords${suffix}`,
+			`/v1/internal/mcp/apple-ads/keywords?${query}`,
 			auth,
 			undefined,
 			GetAppleAdsKeywordsResponseSchema,
@@ -657,22 +631,17 @@ export class AppActorApiClient {
 
 	getAppleAdsNegativeKeywords(
 		auth: InternalToolPrincipal,
-		request: GetAppleAdsNegativeKeywordsRequest = {},
+		request: GetAppleAdsNegativeKeywordsRequest,
 	) {
-		const query = new URLSearchParams()
+		const query = appleAdsSelectorQuery(request)
 		if (request.campaignId) query.set('campaignId', String(request.campaignId))
 		if (request.adGroupId) query.set('adGroupId', String(request.adGroupId))
 		if (request.limit !== undefined) query.set('limit', String(request.limit))
 		if (request.offset !== undefined)
 			query.set('offset', String(request.offset))
-		if (request.profile) query.set('profile', request.profile)
-		if (request.connectionId) query.set('connectionId', request.connectionId)
-		if (request.organizationId)
-			query.set('organizationId', request.organizationId)
-		const suffix = query.size ? `?${query}` : ''
 		return this.request(
 			'GET',
-			`/v1/internal/mcp/apple-ads/negative-keywords${suffix}`,
+			`/v1/internal/mcp/apple-ads/negative-keywords?${query}`,
 			auth,
 			undefined,
 			GetAppleAdsNegativeKeywordsResponseSchema,

@@ -30,18 +30,29 @@ Every one of them, reads included, is a live call to Apple.
 
 ## Which connection answers
 
-Every call takes an optional `connectionId`. **Today it is not optional in
-practice:** without it the production API answers `No active Apple Search Ads
-connection or credential profile found for this organization` on every tool,
-and `organizationId` is accepted but never read. No MCP read returns a
-connection id (`appactor:workspace` explains why ids are redacted), so the only
-source is the user. Ask once; if they do not have one, say the Apple Ads tools
-cannot be used from here yet and point them at the dashboard's Apple Ads pages.
-Do not retry without an id and do not guess one. The intended fix is a
-`connectionName` selector like `update_app`'s `asaConnectionName`.
+Every call takes `organizationId` (required) and an optional `connectionName`.
+The API checks membership, the consent grant and the `asa.manage` account
+permission from the organization, then picks the connection:
 
-Never send `profile`: it selects a local developer profile and production
-rejects it.
+| Sent | Result |
+|---|---|
+| no `connectionName`, organization has one connection | that one — the normal case |
+| no `connectionName`, several connections | 400 naming them: pass one back |
+| no `connectionName`, no connections | 404: add one in AppActor's Apple Ads settings first |
+| `connectionName` | that connection; an unknown name is a 404 that lists the names |
+| `connectionName` shared by two connections | 409 with their Apple org ids: names are not unique, ask the user to rename one in the dashboard |
+
+`get_app_setup { organizationId, appId }` on an iOS app lists the names under
+`connections.asa.available` (only for a member holding `asa.manage`;
+`appactor:workspace` covers the permission). There is no `connectionId`: MCP
+reads redact ids, so nothing on this surface takes one.
+
+Two 403s are not scope problems and no retry fixes them: the member lacks
+`asa.manage` (the dashboard's Apple Ads pages refuse the same member, and only
+an organization owner can grant it), or the AI connection was consented for
+*selected projects* only — Apple Ads connections are organization-wide, so
+such a connection is refused on every Apple Ads tool until it is reconnected
+with all projects.
 
 ## The shape of an account
 
@@ -91,10 +102,9 @@ which is what `pause` and `resume` do.
 ### The safety guard
 
 The API refuses a **bid above 10** or a **daily budget above 500** in the
-account's currency. The error reads *"Safety Guard: … Use force=true if you
-deliberately intend …"* — but `force` is not a field these tools accept, so no
-retry will pass. Tell the user the limit and that a higher amount is set in the
-dashboard, and stop.
+account's currency with a 400 that says the Apple Ads tools cannot override
+it. There is no `force` field and no retry that passes. Tell the user the
+limit and that a higher amount is set in the dashboard, and stop.
 
 ### Delete is permanent
 

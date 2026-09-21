@@ -62,7 +62,7 @@ export function registerAppleAdsTools(
 		{
 			title: 'List Apple Ads Accounts',
 			description:
-				'List authorized Apple Ads ad accounts associated with the active credential or connection.',
+				'List the Apple Ads ad accounts the selected connection is authorized for.',
 			inputSchema: ListAppleAdsAccountsRequestSchema,
 			outputSchema: ListAppleAdsAccountsResponseSchema,
 			annotations: READ_TOOL_ANNOTATIONS_OPEN_WORLD,

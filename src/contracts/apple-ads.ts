@@ -9,24 +9,18 @@ const MatchTypeEnum = z.enum(['EXACT', 'BROAD'])
 // ── Base & Credential Selection ─────────────────────────────────────────────
 
 export const AppleAdsSelectorSchema = z.object({
-	profile: z
+	organizationId: z.uuid().describe('AppActor organization UUID.'),
+	connectionName: z
 		.string()
+		.trim()
 		.min(1)
+		.max(255)
 		.optional()
 		.describe(
-			'Local Apple Ads profile name (e.g. AppMerge). Used in development/testing.',
+			'Name of the Apple Ads connection in AppActor, as get_app_setup lists it under connections.asa.available. Omit it when the organization has exactly one connection; with several, the API refuses and names them.',
 		),
-	connectionId: z
-		.string()
-		.uuid()
-		.optional()
-		.describe('Apple Ads connection UUID stored in AppActor.'),
-	organizationId: z
-		.string()
-		.uuid()
-		.optional()
-		.describe('AppActor organization UUID.'),
 })
+export type AppleAdsSelector = z.infer<typeof AppleAdsSelectorSchema>
 
 // ── Accounts & Apps ─────────────────────────────────────────────────────────
 
