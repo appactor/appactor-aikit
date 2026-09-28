@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.5.3
+
+- **`appactor:react-native` keeps the purchase-intent listener for the app's
+  lifetime.** The Events section told agents to remove every subscription on
+  unmount, `onPurchaseIntent` included, so a promoted in-app purchase or a
+  win-back offer tapped in the App Store could reach an app with no listener
+  and never be bought. The skill now says to register that one listener once,
+  at module scope in the entry file, and to call `purchaseFromIntent` from it;
+  other listeners still come off on unmount. It also notes what
+  `appactor-react-native` 0.2.1 holds: intents that arrive with no listener,
+  for five minutes, dropped by `reset()`.
+
 ## 0.5.2
 
 - **No bid or budget ceiling.** The API no longer refuses bids above 10 or

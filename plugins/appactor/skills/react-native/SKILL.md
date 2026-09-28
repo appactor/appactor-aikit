@@ -114,7 +114,7 @@ Only `restorePurchases` belongs behind a user-facing "Restore" button.
 ## Events
 
 Each stream is an `AppActorEventStream` exposing `addListener`, which returns a
-subscription you must remove on unmount:
+subscription. A listener that belongs to a screen is removed on unmount:
 
 ```ts
 useEffect(() => {
@@ -125,6 +125,28 @@ useEffect(() => {
 
 Available streams: `onCustomerInfoUpdated`, `onReceiptPipelineEvent`,
 `onPurchaseIntent` (iOS 16.4+), `onDeferredPurchaseResolved`, `onSdkLog`.
+
+**`onPurchaseIntent` is the exception: register it once, at app start, and
+never remove it.** On iOS 16.4+ a purchase the user starts in the App Store (a
+promoted in-app purchase, or a win-back offer) arrives here, and nothing is
+bought until the app calls `purchaseFromIntent(intent)`. Put the listener in the
+app's entry file at module scope, before or right after `configure()`, not in a
+paywall component:
+
+```ts
+// index.js, module scope
+AppActor.instance.onPurchaseIntent.addListener((intent) => {
+  AppActor.instance
+    .purchaseFromIntent(intent)
+    .catch((error) => console.warn('purchaseFromIntent failed', error));
+});
+```
+
+Since 0.2.1, an intent that arrives while no listener exists (a cold launch
+from the App Store) is held and handed to the next listener, but only for five
+minutes, and `reset()` drops it. A listener that lives on one screen still loses
+the purchase when the user doesn't reach that screen in time. Android never
+emits intents.
 
 `addListener` throws an `AppActorError` if the native event emitter is not
 linked — that means the native module was not installed correctly, not that
