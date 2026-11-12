@@ -40,7 +40,7 @@ export function registerCatalogWriteTools(
 		{
 			title: 'Manage AppActor Products',
 			description:
-				'Discover store products or idempotently import/classify products. This tool cannot delete products or manage credentials.',
+				'Discover store products or idempotently import/classify products. A Google one-time product is discovered as productType "inapp"; import it as "consumable" or "non_consumable" (inapp is refused). This tool cannot delete products or manage credentials.',
 			inputSchema: ManageProductsRequestSchema,
 			outputSchema: ManageProductsResponseSchema,
 			annotations: writeToolAnnotations(true, true),
