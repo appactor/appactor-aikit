@@ -1,6 +1,10 @@
 import { afterEach, describe, expect, test } from 'bun:test'
 import { SignJWT, generateKeyPair, jwtVerify } from 'jose'
-import { createApp } from '../src/app'
+import {
+	createApp,
+	leaveRotation,
+	resetLeavingRotationForTests,
+} from '../src/app'
 import {
 	issueAccessToken,
 	modernMeta,
@@ -10,6 +14,7 @@ import {
 
 afterEach(() => {
 	stopTestServers()
+	resetLeavingRotationForTests()
 })
 
 describe('MCP HTTP app', () => {
@@ -28,6 +33,18 @@ describe('MCP HTTP app', () => {
 				})
 			).status,
 		).toBe(400)
+	})
+
+	test('returns 503 on /health when leaving rotation', async () => {
+		const { app } = await testConfig()
+		leaveRotation()
+		const response = await app.request('https://mcp.example.com/health')
+		expect(response.status).toBe(503)
+		expect(await response.json()).toEqual({
+			status: 'terminating',
+			ok: false,
+			leavingRotation: true,
+		})
 	})
 
 	test('rejects an invalid private key before serving traffic', async () => {

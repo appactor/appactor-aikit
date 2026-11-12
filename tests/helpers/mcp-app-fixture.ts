@@ -34,6 +34,7 @@ export async function createMcpAppFixture(
 		MCP_INTERNAL_JWT_ISSUER: 'appactor-mcp',
 		MCP_INTERNAL_JWT_AUDIENCE: 'appactor-api',
 		APPACTOR_API_TIMEOUT_MS: 1_000,
+		SHUTDOWN_UNROUTE_DELAY_MS: 3_500,
 	}
 
 	return {

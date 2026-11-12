@@ -102,6 +102,20 @@ function validMetricsToken(request: Request, expected: string | undefined) {
 	)
 }
 
+let leavingRotation = false
+
+export function leaveRotation(): void {
+	leavingRotation = true
+}
+
+export function isLeavingRotation(): boolean {
+	return leavingRotation
+}
+
+export function resetLeavingRotationForTests(): void {
+	leavingRotation = false
+}
+
 export async function createApp(config: Config, fetcher: typeof fetch = fetch) {
 	const app = new Hono()
 	app.use('*', async (c, next) => {
@@ -146,7 +160,15 @@ export async function createApp(config: Config, fetcher: typeof fetch = fetch) {
 		MCP_SCOPES.map((scope) => [scope, createProtectedHandler(scope)]),
 	)
 
-	app.get('/health', (c) => c.json({ status: 'ok' }))
+	app.get('/health', (c) => {
+		if (isLeavingRotation()) {
+			return c.json(
+				{ status: 'terminating', ok: false, leavingRotation: true },
+				503,
+			)
+		}
+		return c.json({ status: 'ok' })
+	})
 	const protectedResourceMetadata = {
 		resource: config.MCP_RESOURCE_URL,
 		authorization_servers: [config.MCP_AUTH_ISSUER],

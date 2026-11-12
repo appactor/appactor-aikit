@@ -15,6 +15,7 @@ describe('loadConfig', () => {
 		expect(config.PORT).toBe(3100)
 		expect(config.MCP_INTERNAL_JWT_ISSUER).toBe('appactor-mcp')
 		expect(config.APPACTOR_API_TIMEOUT_MS).toBe(35_000)
+		expect(config.SHUTDOWN_UNROUTE_DELAY_MS).toBe(3_500)
 		expect(
 			loadConfig({ ...valid, APPACTOR_API_TIMEOUT_MS: '60000' })
 				.APPACTOR_API_TIMEOUT_MS,

@@ -22,6 +22,12 @@ const ConfigSchema = z
 			.min(100)
 			.max(60_000)
 			.default(35_000),
+		SHUTDOWN_UNROUTE_DELAY_MS: z.coerce
+			.number()
+			.int()
+			.min(0)
+			.max(10_000)
+			.default(3_500),
 	})
 	.superRefine((config, ctx) => {
 		if (config.NODE_ENV === 'production' && !config.MCP_METRICS_AUTH_TOKEN) {
