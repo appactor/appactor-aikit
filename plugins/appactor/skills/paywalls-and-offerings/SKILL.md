@@ -159,7 +159,13 @@ are reads in write clothing and take **no** key — passing one is a validation
 error, because these schemas reject unknown fields.
 
 - `manage_products` — `discover` reads what the connected store actually has,
-  `import` brings SKUs into AppActor, `classify` sets product type and display name.
+  `import` brings SKUs into AppActor, `classify` changes a stored product's type
+  or display name. A Google one-time product comes out of `discover` as
+  `productType: "inapp"`, because Play does not say whether the app consumes it.
+  `import` refuses `inapp`: set `consumable` or `non_consumable` on each such SKU
+  before importing, and ask when its name does not make the answer obvious.
+  Until a one-time product is imported with its type, its purchases are answered
+  retryable (`PRODUCT_NOT_CONFIGURED`): the device keeps them and posts them again.
 - `manage_entitlements` — `create`, `update`, `attach_product`.
 - `manage_offerings` — `create`, `update`, then `preview_publish` →
   `apply_publish`.

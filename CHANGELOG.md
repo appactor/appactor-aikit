@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.5.4
+
+- **A Google one-time product is imported with its type.** `discover` reports
+  one as `productType: "inapp"`, since Play does not say whether the app
+  consumes it. The API now refuses `inapp` on every catalog write, so the old
+  "import, then classify" flow fails for these SKUs. `appactor:paywalls-and-offerings`
+  and the `manage_products` description now say to set `consumable` or
+  `non_consumable` on each one before `import`. They also say that its purchases
+  are answered retryable (`PRODUCT_NOT_CONFIGURED`) until then. Requires
+  `appactor-final-api` #672.
+
 ## 0.5.3
 
 - **`appactor:react-native` keeps the purchase-intent listener for the app's
