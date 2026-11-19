@@ -77,7 +77,7 @@ export function errorResult(error: unknown, idempotentWrite = false) {
 					code: error.code,
 					requestId: error.requestId,
 					status: error.status,
-					...(error.details === undefined ? {} : { details: error.details }),
+					details: error.details,
 				}
 			: undefined
 	// A 429 is the one failure the model can actually act on: it is not
