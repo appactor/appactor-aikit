@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.5.5
+
+- **`manage_packages` `update` takes `applyTokenAmountToSharedPackages`.** The
+  API keeps one token amount per store product per project (plan 2-42) and
+  refuses a conflicting `tokenAmount` with 409 `TOKEN_AMOUNT_CONFLICT`; its
+  opt-in to write the amount to every package selling the product was refused
+  here by the strict schema, so MCP could only fail. The field now passes
+  through, and `appactor:paywalls-and-offerings` says when to use it.
+  Requires `appactor-final-api` #754.
+
 ## 0.5.4
 
 - **A Google one-time product is imported with its type.** `discover` reports
