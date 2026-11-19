@@ -100,7 +100,7 @@ import { canonicalRequestTarget, sha256Hex } from './request-binding'
 
 type ApiEnvelope<T> = { data: T; requestId: string }
 type ApiErrorEnvelope = {
-	error?: { code?: string; message?: string }
+	error?: { code?: string; message?: string; details?: unknown }
 	requestId?: string
 }
 
@@ -112,6 +112,8 @@ export class AppActorApiError extends Error {
 		readonly requestId?: string,
 		/** Seconds the caller should wait, from the upstream Retry-After header. */
 		readonly retryAfterSeconds?: number,
+		/** What the API attached to a refusal, e.g. the packages a TOKEN_AMOUNT_CONFLICT names. */
+		readonly details?: unknown,
 	) {
 		super(message)
 		this.name = 'AppActorApiError'
@@ -198,6 +200,7 @@ export class AppActorApiClient {
 					error?.code,
 					responseBody?.requestId,
 					parseRetryAfter(response),
+					error?.details,
 				)
 			}
 			return responseSchema

@@ -73,7 +73,12 @@ export function errorResult(error: unknown, idempotentWrite = false) {
 		error instanceof Error ? error.message : 'Unknown AppActor error.'
 	const details =
 		error instanceof AppActorApiError
-			? { code: error.code, requestId: error.requestId, status: error.status }
+			? {
+					code: error.code,
+					requestId: error.requestId,
+					status: error.status,
+					...(error.details === undefined ? {} : { details: error.details }),
+				}
 			: undefined
 	// A 429 is the one failure the model can actually act on: it is not
 	// uncertain, nothing was written, and there is a concrete wait attached.

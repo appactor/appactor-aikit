@@ -385,6 +385,44 @@ describe('MCP controlled write tools', () => {
 		expect(upstreamCalls).toBe(0)
 	})
 
+	test('passes the details of a refused write to the model', async () => {
+		const conflict = {
+			packages: [
+				{ id: 'pkg-1', tokenAmount: 1350 },
+				{ id: 'pkg-2', tokenAmount: 1350 },
+			],
+		}
+		const fixture = await createMcpAppFixture(async () =>
+			Response.json(
+				{
+					error: {
+						code: 'TOKEN_AMOUNT_CONFLICT',
+						message: 'Token amount conflicts.',
+						details: conflict,
+					},
+					requestId: 'request-conflict',
+				},
+				{ status: 409 },
+			),
+		)
+		const token = await accessToken(fixture, 'workspace:write')
+		const response = await rpc(
+			fixture,
+			token,
+			'tools/call',
+			{
+				name: 'create_project',
+				arguments: toolCases[4].arguments,
+				_meta: modernMeta(),
+			},
+			'create_project',
+		)
+		const body = await response.json()
+		expect(body.result?.isError).toBe(true)
+		expect(body.result?.content?.[0]?.text).toContain('TOKEN_AMOUNT_CONFLICT')
+		expect(body.result?.content?.[0]?.text).toContain(JSON.stringify(conflict))
+	})
+
 	test('tells the model to reuse the same idempotency key after an uncertain write', async () => {
 		const fixture = await createMcpAppFixture(async () =>
 			Response.json(

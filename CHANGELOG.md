@@ -9,6 +9,9 @@
   here by the strict schema, so MCP could only fail. The field now passes
   through, and `appactor:paywalls-and-offerings` says when to use it.
   Requires `appactor-final-api` #754.
+- **A refused write carries the API's `details`.** Tool errors dropped them, so
+  a `TOKEN_AMOUNT_CONFLICT` showed one package and "N more" instead of the list
+  the user has to approve.
 
 ## 0.5.4
 
