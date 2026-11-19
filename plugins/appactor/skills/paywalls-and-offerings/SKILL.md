@@ -170,6 +170,14 @@ error, because these schemas reject unknown fields.
 - `manage_offerings` — `create`, `update`, then `preview_publish` →
   `apply_publish`.
 - `manage_packages` — `create`, `update`, `attach_product`.
+  A store product grants one token amount per project, whichever package sells
+  it. An `update` whose `tokenAmount` differs from another package selling the
+  same product is refused (409 `TOKEN_AMOUNT_CONFLICT`); the error's `details`
+  list the packages that would change. Show the user that list; on their yes,
+  send the `update` again with `applyTokenAmountToSharedPackages: true` and a
+  new `idempotencyKey` (it is a different request), which writes the amount to
+  all of them. `attach_product` can be refused the same way and has no opt-in:
+  align the amounts first. A token-amount experiment needs its own store product.
 
 Start from `discover`, not from typed-in product IDs. It returns the SKUs the
 store reports, which is the only way to be sure an ID matches.

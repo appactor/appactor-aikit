@@ -143,6 +143,19 @@ const scenarios = [
 		name: 'manage_packages',
 		path: '/v1/internal/mcp/packages',
 		arguments: {
+			action: 'update',
+			organizationId: ids.organization,
+			idempotencyKey: 'update-package-token-amount-1',
+			packageId: ids.resource,
+			tokenAmount: 1400,
+			applyTokenAmountToSharedPackages: true,
+		},
+		response: succeeded('update', { package: pkg }),
+	},
+	{
+		name: 'manage_packages',
+		path: '/v1/internal/mcp/packages',
+		arguments: {
 			action: 'attach_product',
 			organizationId: ids.organization,
 			idempotencyKey: 'attach-package-product-1',

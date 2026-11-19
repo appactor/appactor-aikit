@@ -180,6 +180,8 @@ export const ManagePackagesRequestSchema = z.discriminatedUnion('action', [
 			position: z.number().int().min(0).optional(),
 			isActive: z.boolean().optional(),
 			tokenAmount: z.number().int().min(0).nullable().optional(),
+			/** With `tokenAmount`: write it to every package selling the same products instead of a 409 TOKEN_AMOUNT_CONFLICT. */
+			applyTokenAmountToSharedPackages: z.boolean().optional(),
 			expectedUpdatedAt: z.string().datetime().optional(),
 		})
 		.strict(),
