@@ -560,6 +560,8 @@ describe('manage_experiments rollout and analysis plan', () => {
 			'results.decision',
 			'roughly day 14',
 			'roughly day 37',
+			'trial starters per arm',
+			'paying users per arm',
 			'srm_mismatch',
 		]) {
 			expect(manage?.description).toContain(phrase)
