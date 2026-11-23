@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.6.1
+
+- Experiment tools and the experiment skill now explain which users count
+  toward a verdict. Trial-start goals count users who started a trial.
+  Other primary goals count paying users.
+
 ## 0.6.0
 
 - **`manage_experiments` rolls a variant out to everyone.** Two new actions

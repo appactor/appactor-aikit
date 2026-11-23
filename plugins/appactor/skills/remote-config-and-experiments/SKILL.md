@@ -146,8 +146,9 @@ experiment**:
   roll it out without saying so). Every other status reads `not_applicable`.
 - `earliestVerdictAt` is set while only time holds the verdict back: roughly
   day 14 after the first assignment for a 7-day primary, roughly day 37 for a
-  30-day one. It is the earliest possible time, not a promise — enough paying
-  users and a significant difference are still needed.
+  30-day one. The sample threshold counts trial starters per arm for
+  `userToTrialConversionRate` and `newTrials`, and paying users per arm for
+  other primary goals. A winner also needs a significant difference.
 - `primary.best` is the winner, or else the challenger with the best point
   estimate, with its own `verdict` (`better`, `worse`, `inconclusive`,
   `not_tested`). A best that is not the winner is a lead, not a result.
