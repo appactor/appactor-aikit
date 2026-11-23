@@ -11,12 +11,13 @@
   experiment stays stopped and its results stay frozen. Rolling out another run
   of the same key replaces that run's rollout, and the summary names it from
   `supersededExperimentId`, which a text-only client would otherwise never see.
-- **`create` and `update` take `whaleCapCents` and `newUsersOnly`.** The strict
-  schema refused both although the API accepts them. `whaleCapCents`
-  (1–1,000,000,000; `null` is the default, $500) is editable only before the
-  first assignment. `create` defaults `newUsersOnly` to `false` as the API
-  does; `update` sends neither unless given, and an explicit `null` cap reaches
-  the API as `null` (reset to the default).
+- **`create` and `update` take `whaleCapCents` and `newUsersOnly`.** The API
+  already accepted `newUsersOnly`, but the strict schema here refused it;
+  `whaleCapCents` is new on both sides. `whaleCapCents` (1–1,000,000,000;
+  `null` is the default, $500) is editable only before the first assignment.
+  `create` defaults `newUsersOnly` to `false` as the API does; `update` sends
+  neither unless given, and an explicit `null` cap reaches the API as `null`
+  (reset to the default).
 - **The descriptions state the analysis-plan lock and how to read a result.**
   Once users are assigned, variants, weights, goals and the whale cap are
   locked (409 `EXPERIMENT_ANALYSIS_PLAN_LOCKED`); a winner ships with

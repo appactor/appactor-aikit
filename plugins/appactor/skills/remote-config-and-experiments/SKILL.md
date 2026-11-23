@@ -97,7 +97,9 @@ targeting, `newUsersOnly`, and on bucketing v2 the traffic allocation.
 So settle the split, the goals and the whale cap before `start`. To test a
 different split after launch, stop the experiment and create a new run:
 `create` with the same `key` makes that key's next `iteration`, with its own
-variants and fresh assignments. Two runs of one key cannot run at once.
+variants and fresh assignments. Two runs of one key cannot run at once. If an
+earlier run of the key is rolled out, everyone the new run does not enrol
+(outside its traffic or targeting) keeps getting the rolled-out variant.
 
 ### Goals and primary metrics
 
@@ -216,9 +218,10 @@ rollout time).
   moves the rollout.
 - One rollout per key: rolling out another run of the same key replaces that
   run's rollout, and the result names it in `supersededExperimentId`.
-- `clear_rollout` stops serving the variant, and users go back to what the app
-  shows outside the experiment. The experiment stays stopped and its results
-  stay frozen — it is not a resume.
+- `clear_rollout` stops serving the variant, and users go back to what they
+  would get without it: the app's default, or a running run of the same key if
+  that run enrols them. The experiment stays stopped and its results stay
+  frozen — it is not a resume.
 - While rolled out (`lifecycle.rollout` names the variant), `to_draft` is
   refused.
 
@@ -289,8 +292,10 @@ device. A device that already has an entitlement is a common accidental
 exclusion.
 
 **Everyone gets the same variant.** The experiment was probably rolled out:
-`lifecycle.rollout` names the variant. To the SDK a rollout looks exactly like
-an assignment. `clear_rollout` ends it — after the user agrees.
+`lifecycle.rollout` names the variant. Check the key's other runs too — a
+running run hands an earlier run's rollout to everyone it does not enrol. To the
+SDK a rollout looks exactly like an assignment. `clear_rollout` ends it — after
+the user agrees.
 
 **Variant payload is null.** The variant's `valueType` and the shape you decode
 have to agree; a `json` payload decoded as a string yields nothing.
