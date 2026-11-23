@@ -21,10 +21,12 @@
 - **The descriptions state the analysis-plan lock and how to read a result.**
   Once users are assigned, variants, weights, goals and the whale cap are
   locked (409 `EXPERIMENT_ANALYSIS_PLAN_LOCKED`); a winner ships with
-  `rollout_variant`, never new weights; rolling out, starting or stopping
-  needs the user's confirmation. `get_config` and `manage_experiments` share
-  one rule for results: one verdict per experiment (`results.decision`, the
-  same in every resultMode), the earliest verdict roughly day 14 for a
+  `rollout_variant`, never new weights; starting, pausing, resuming,
+  stopping, rolling out and clearing a rollout need the user's confirmation;
+  and a rollout is never cleared just to try `to_draft`, which still needs an
+  experiment that never assigned anyone. `get_config` and `manage_experiments`
+  share one rule for results: one verdict per experiment (`results.decision`,
+  the same in every resultMode), the earliest verdict roughly day 14 for a
   trial-start primary goal and day 37 for any other (`earliestVerdictAt`), and
   an SRM mismatch means the results cannot be trusted.
 - **`appactor:remote-config-and-experiments` follows the new model.** The

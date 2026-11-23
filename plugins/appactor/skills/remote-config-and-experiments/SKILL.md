@@ -187,9 +187,10 @@ React Native — same shape. The result is never null: `experimentKey`,
 **Not being enrolled is normal**, not an error. `isEnrolled` is `false`
 (the raw assignment is null) when the customer is outside the traffic
 allocation, was seen before the start of a `newUsersOnly` experiment, fails
-targeting, or the experiment is neither running nor rolled out. The typed
-getters return your default, so control renders with no extra branch — do not
-retry.
+targeting, or the experiment is not enrolling them: a paused experiment keeps
+serving customers their stored assignment but enrols no one new, and a stopped
+one serves no one unless it was rolled out. The typed getters return your
+default, so control renders with no extra branch — do not retry.
 
 Assignment is sticky per customer, so a customer sees one variant consistently.
 Branch on `variantKey`, or read the variant's `payload` when the variant carries
@@ -218,12 +219,16 @@ rollout time).
   moves the rollout.
 - One rollout per key: rolling out another run of the same key replaces that
   run's rollout, and the result names it in `supersededExperimentId`.
-- `clear_rollout` stops serving the variant, and users go back to what they
-  would get without it: the app's default, or a running run of the same key if
-  that run enrols them. The experiment stays stopped and its results stay
-  frozen — it is not a resume.
+- `clear_rollout` takes the variant away from the whole audience within about
+  five minutes: users go back to what they would get without it — the app's
+  default, or a running run of the same key if that run enrols them. The
+  experiment stays stopped and its results stay frozen — it is not a resume.
 - While rolled out (`lifecycle.rollout` names the variant), `to_draft` is
-  refused.
+  refused — and clearing the rollout does not unlock it. `to_draft` also needs
+  an experiment that never assigned anyone, which a rolled-out experiment
+  almost never is, so it would still fail after the audience lost the variant.
+  Never clear a rollout to get back to draft; to change the variants, create a
+  new run.
 
 A stopped experiment's result becomes final about 400 days after its last
 assignment (`lifecycle.finalizesAt`, then `lifecycle.isFinalized`). A finalized
@@ -267,8 +272,9 @@ Write with `manage_experiments`:
   `resume`, or `to_draft`, and `rollout_variant` / `clear_rollout`.
 - `update`, `update_variant` and `replace_variant_weights` work only on a draft
   or paused experiment, and `create_variants` only while it has no variants.
-- **Rolling out, starting, or stopping an experiment changes what live
-  customers see.** Confirm with the user before any of them.
+- **Starting, pausing, resuming, or stopping an experiment, rolling a variant
+  out, and clearing a rollout all change what live customers see.** Confirm
+  with the user before any of them.
 
 Every mutation takes a client-generated `idempotencyKey`. Deleting a config, an
 experiment, or a variant is not available from MCP — those stay in the
