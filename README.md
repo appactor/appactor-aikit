@@ -61,7 +61,7 @@ Skills load as `appactor:<name>` — the plugin supplies the namespace.
 | --- | --- |
 | `appactor:workspace` | using the tools: orientation, analytics, idempotent writes, preview/apply |
 | `appactor:paywalls-and-offerings` | products, entitlements, offerings, packages, and building a paywall |
-| `appactor:remote-config-and-experiments` | config keys, targeting rules, variants, traffic weights, metrics |
+| `appactor:remote-config-and-experiments` | config keys, targeting rules, variants, traffic weights, metrics, verdicts, rolling out a winner |
 | `appactor:refund-saver` | what AppActor tells Apple when a customer asks for a refund |
 | `appactor:asa` | Apple Search Ads: campaigns, ad groups, keywords, bids, budgets, performance reports |
 | `appactor:troubleshooting` | "paid but no access", stuck receipts, sandbox confusion, signature failures |

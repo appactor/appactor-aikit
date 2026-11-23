@@ -1,5 +1,49 @@
 # Changelog
 
+## 0.6.0
+
+- **`manage_experiments` rolls a variant out to everyone.** Two new actions
+  mirror the API's "roll out winner". `rollout_variant { experimentId,
+  variantId, expectedUpdatedAt? }` ends the experiment and serves that variant
+  to its whole audience: everyone matching its targeting plus every user it
+  already assigned, whatever the traffic allocation or `newUsersOnly`.
+  `clear_rollout { experimentId, expectedUpdatedAt? }` stops serving it; the
+  experiment stays stopped and its results stay frozen. Rolling out another run
+  of the same key replaces that run's rollout, and the summary names it from
+  `supersededExperimentId`, which a text-only client would otherwise never see.
+- **`create` and `update` take `whaleCapCents` and `newUsersOnly`.** The strict
+  schema refused both although the API accepts them. `whaleCapCents`
+  (1–1,000,000,000; `null` is the default, $500) is editable only before the
+  first assignment. `create` defaults `newUsersOnly` to `false` as the API
+  does; `update` sends neither unless given, and an explicit `null` cap reaches
+  the API as `null` (reset to the default).
+- **The descriptions state the analysis-plan lock and how to read a result.**
+  Once users are assigned, variants, weights, goals and the whale cap are
+  locked (409 `EXPERIMENT_ANALYSIS_PLAN_LOCKED`); a winner ships with
+  `rollout_variant`, never new weights; rolling out, starting or stopping
+  needs the user's confirmation. `get_config` and `manage_experiments` share
+  one rule for results: one verdict per experiment (`results.decision`, the
+  same in every resultMode), the earliest verdict roughly day 14 for a
+  trial-start primary goal and day 37 for any other (`earliestVerdictAt`), and
+  an SRM mismatch means the results cannot be trusted.
+- **`appactor:remote-config-and-experiments` follows the new model.** The
+  Lifecycle section no longer says to avoid changing weights mid-flight or to
+  make the winner the default by hand: winners ship with `rollout_variant`. New
+  sections cover what locks at the first assignment and how to read a verdict,
+  listing every decision status and reason (`rolled_out_before_result`,
+  `finalized_before_result`, `guardrailStatus` `not_applicable`). "Result
+  modes" no longer claims a variant can win under one mode and lose under
+  another — the verdict is the same in all three. `to_draft` is described as
+  it works: paused or stopped experiments that never assigned anyone.
+- No response schema changes: `get_config`, `query_analytics` and every write
+  result carry `data` / `result` as an open record, so the reworked experiment
+  objects (lifecycle, rollout, the decision and SRM summary) pass through as
+  the API sends them.
+- Requires `appactor-final-api` branch `feat/faz7a-7-05-06-13` (Stage 2A
+  experiments with roll out winner). **Deploy the API first:** an older API
+  refuses `rollout_variant`, `clear_rollout` and `whaleCapCents` with a
+  validation error.
+
 ## 0.5.5
 
 - **`manage_packages` `update` takes `applyTokenAmountToSharedPackages`.** The

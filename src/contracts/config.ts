@@ -303,6 +303,23 @@ const VariantWeightsSummingToFull = VariantWeights.min(1).superRefine(
 		}
 	},
 )
+/**
+ * The API's WhaleCapCentsSchema. On update an absent key leaves the cap alone
+ * and an explicit null resets it to the default, so it must stay nullish with
+ * no default here.
+ */
+const WhaleCapCents = z
+	.number()
+	.int()
+	.min(1)
+	.max(1_000_000_000)
+	.nullish()
+	.describe(
+		'Whale cap in cents: when a money goal is tested, each user counts for at most this much revenue, so one big spender cannot decide the result. null selects the default, 50000 ($500). Editable only before the first assignment: once any user is assigned, a different value is refused with 409 EXPERIMENT_ANALYSIS_PLAN_LOCKED.',
+	)
+const NewUsersOnly = z
+	.boolean()
+	.describe('Assign only users first seen after the experiment started.')
 const CreateVariant = z
 	.object({
 		key: ExperimentKey,
@@ -331,12 +348,14 @@ export const ManageExperimentsRequestSchema = z.discriminatedUnion('action', [
 				.max(10000)
 				.optional()
 				.default(10000),
+			newUsersOnly: NewUsersOnly.optional().default(false),
 			targetingConditions: z
 				.array(ConfigCondition)
 				.max(10)
 				.optional()
 				.default([]),
 			goals: z.array(Goal).max(10).optional().default([]),
+			whaleCapCents: WhaleCapCents,
 		})
 		.strict(),
 	z
@@ -349,8 +368,10 @@ export const ManageExperimentsRequestSchema = z.discriminatedUnion('action', [
 			name: z.string().max(200).nullish(),
 			description: z.string().max(2000).nullish(),
 			trafficAllocationBp: z.number().int().min(0).max(10000).optional(),
+			newUsersOnly: NewUsersOnly.optional(),
 			targetingConditions: z.array(ConfigCondition).max(10).optional(),
 			goals: z.array(Goal).max(10).optional(),
+			whaleCapCents: WhaleCapCents,
 		})
 		.strict(),
 	z
@@ -396,6 +417,25 @@ export const ManageExperimentsRequestSchema = z.discriminatedUnion('action', [
 			experimentId: ResourceId,
 			expectedVariants: VariantWeights,
 			variants: VariantWeightsSummingToFull,
+		})
+		.strict(),
+	z
+		.object({
+			action: z.literal('rollout_variant'),
+			organizationId: OrganizationId,
+			idempotencyKey: IdempotencyKey,
+			experimentId: ResourceId,
+			variantId: ResourceId,
+			expectedUpdatedAt: ExpectedUpdatedAt.optional(),
+		})
+		.strict(),
+	z
+		.object({
+			action: z.literal('clear_rollout'),
+			organizationId: OrganizationId,
+			idempotencyKey: IdempotencyKey,
+			experimentId: ResourceId,
+			expectedUpdatedAt: ExpectedUpdatedAt.optional(),
 		})
 		.strict(),
 ])
