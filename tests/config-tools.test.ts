@@ -329,6 +329,251 @@ describe('config write tools', () => {
 	})
 })
 
+describe('manage_experiments rollout and analysis plan', () => {
+	const variantId = ids.resource
+	const supersededExperimentId = ids.project
+	const experiment = { experimentId, key: 'paywall_test', status: 'stopped' }
+
+	function experimentWrite(action: string, result: Record<string, unknown>) {
+		return {
+			status: 'succeeded',
+			action,
+			replayed: false,
+			operationId: ids.operation,
+			result,
+		}
+	}
+
+	test('sends rollout_variant to the experiments route exactly as given', async () => {
+		const capture: { request?: Request; body?: string } = {}
+		const args = {
+			action: 'rollout_variant',
+			organizationId,
+			idempotencyKey,
+			experimentId,
+			variantId,
+			expectedUpdatedAt: timestamp,
+		}
+		const { fixture, body } = await callTool(
+			'manage_experiments',
+			'config:write',
+			experimentWrite('rollout_variant', {
+				experiment,
+				supersededExperimentId: null,
+			}),
+			args,
+			capture,
+		)
+
+		expect(body.result.isError).toBeUndefined()
+		expect(JSON.parse(capture.body ?? '{}')).toEqual(args)
+		const authorization = capture.request?.headers.get('authorization') ?? ''
+		const { payload: claims } = await jwtVerify(
+			authorization.slice(7),
+			fixture.internalPublicKey,
+			{ issuer: 'appactor-mcp', audience: 'appactor-api' },
+		)
+		expect(claims.tool).toBe('manage_experiments')
+		expect(claims.scope).toBe('config:write')
+		expect(claims.target).toBe('/v1/internal/mcp/experiments')
+		expect(claims.body_sha256).toBe(await sha256Hex(capture.body))
+		expect(body.result.content[0].text).toBe(
+			'Experiment rollout_variant succeeded.',
+		)
+	})
+
+	test('says which run of the key stopped serving when a rollout replaced it', async () => {
+		// Only in the structured half otherwise, so a text-only client would never
+		// learn that the other run's rollout ended.
+		const { body } = await callTool(
+			'manage_experiments',
+			'config:write',
+			experimentWrite('rollout_variant', {
+				experiment,
+				supersededExperimentId,
+			}),
+			{
+				action: 'rollout_variant',
+				organizationId,
+				idempotencyKey,
+				experimentId,
+				variantId,
+			},
+		)
+		expect(body.result.content[0].text).toBe(
+			`Experiment rollout_variant succeeded. It replaced the rollout of experiment ${supersededExperimentId}, another run of the same key, which no longer serves a variant.`,
+		)
+	})
+
+	test('sends clear_rollout with only the experiment it names', async () => {
+		const capture: { request?: Request; body?: string } = {}
+		const args = {
+			action: 'clear_rollout',
+			organizationId,
+			idempotencyKey,
+			experimentId,
+		}
+		const { body } = await callTool(
+			'manage_experiments',
+			'config:write',
+			experimentWrite('clear_rollout', { experiment }),
+			args,
+			capture,
+		)
+		expect(body.result.isError).toBeUndefined()
+		expect(JSON.parse(capture.body ?? '{}')).toEqual(args)
+		expect(body.result.content[0].text).toBe(
+			'Experiment clear_rollout succeeded.',
+		)
+	})
+
+	test('passes newUsersOnly and the whale cap through create', async () => {
+		const capture: { request?: Request; body?: string } = {}
+		await callTool(
+			'manage_experiments',
+			'config:write',
+			experimentWrite('create', { experiment }),
+			{
+				action: 'create',
+				organizationId,
+				idempotencyKey,
+				appId: configId,
+				key: 'paywall_test',
+				newUsersOnly: true,
+				whaleCapCents: 25000,
+			},
+			capture,
+		)
+		expect(JSON.parse(capture.body ?? '{}')).toMatchObject({
+			action: 'create',
+			newUsersOnly: true,
+			whaleCapCents: 25000,
+		})
+	})
+
+	test('defaults newUsersOnly on create as the API does and leaves the whale cap unset', async () => {
+		const capture: { request?: Request; body?: string } = {}
+		await callTool(
+			'manage_experiments',
+			'config:write',
+			experimentWrite('create', { experiment }),
+			{
+				action: 'create',
+				organizationId,
+				idempotencyKey,
+				appId: configId,
+				key: 'paywall_test',
+			},
+			capture,
+		)
+		const sent = JSON.parse(capture.body ?? '{}')
+		expect(sent.newUsersOnly).toBe(false)
+		expect('whaleCapCents' in sent).toBe(false)
+	})
+
+	test('keeps an explicit null whale cap on update and adds nothing it was not sent', async () => {
+		// null resets the cap to the default; an absent key leaves it alone. A
+		// defaulted newUsersOnly here would silently rewrite the audience rule.
+		const capture: { request?: Request; body?: string } = {}
+		const args = {
+			action: 'update',
+			organizationId,
+			idempotencyKey,
+			experimentId,
+			whaleCapCents: null,
+		}
+		await callTool(
+			'manage_experiments',
+			'config:write',
+			experimentWrite('update', { experiment }),
+			args,
+			capture,
+		)
+		expect(JSON.parse(capture.body ?? '{}')).toEqual(args)
+	})
+
+	test('refuses a rollout the API would reject without calling it', async () => {
+		let upstreamCalls = 0
+		const fixture = await createMcpAppFixture(async () => {
+			upstreamCalls += 1
+			throw new Error('manage_experiments must not reach the API.')
+		})
+		const token = await accessToken(fixture, 'config:write')
+		for (const args of [
+			// Weights are not how a winner ships.
+			{
+				action: 'rollout_variant',
+				organizationId,
+				idempotencyKey,
+				experimentId,
+				variantId,
+				weightBp: 10000,
+			},
+			{
+				action: 'rollout_variant',
+				organizationId,
+				idempotencyKey,
+				experimentId,
+			},
+			{
+				action: 'clear_rollout',
+				organizationId,
+				idempotencyKey,
+				experimentId,
+				variantId,
+			},
+		]) {
+			const response = await rpc(
+				fixture,
+				token,
+				'tools/call',
+				{ name: 'manage_experiments', arguments: args, _meta: modernMeta() },
+				'manage_experiments',
+			)
+			const body = await response.json()
+			expect(body.result.isError).toBe(true)
+			expect(body.result.content[0].text).toContain('Input validation error')
+		}
+		expect(upstreamCalls).toBe(0)
+	})
+
+	test('describes the plan lock, the rollout, and how to read a verdict', async () => {
+		const fixture = await createMcpAppFixture()
+		const token = await accessToken(fixture, 'workspace:read')
+		const response = await rpc(fixture, token, 'tools/list', {
+			_meta: modernMeta(),
+		})
+		const body = await response.json()
+		const tools = body.result.tools as Array<{
+			name: string
+			description: string
+			inputSchema: unknown
+		}>
+		const manage = tools.find((tool) => tool.name === 'manage_experiments')
+		for (const phrase of [
+			'409 EXPERIMENT_ANALYSIS_PLAN_LOCKED',
+			'use rollout_variant, never new weights',
+			'every user it already assigned',
+			'clear_rollout stops serving the variant',
+			'Starting, pausing, resuming or stopping an experiment, rolling a variant out and clearing a rollout all change what live customers see, so confirm with the user first.',
+			'Never clear a rollout to return the experiment to draft',
+			'results.decision',
+			'roughly day 14',
+			'roughly day 37',
+			'srm_mismatch',
+		]) {
+			expect(manage?.description).toContain(phrase)
+		}
+		// Results are read through get_config, so it carries the same reading rule.
+		expect(
+			tools.find((tool) => tool.name === 'get_config')?.description,
+		).toContain('earliestVerdictAt')
+		expect(JSON.stringify(manage?.inputSchema)).toContain(
+			'Editable only before the first assignment',
+		)
+	})
+})
+
 describe('config contracts', () => {
 	test('rejects unknown fields on reads and writes', () => {
 		expect(() =>
@@ -471,6 +716,66 @@ describe('config contracts', () => {
 				key: 'paywall_test',
 				goals: [{ key: 'primary', type: 'vibes', isPrimary: true }],
 			}),
+		).toThrow()
+	})
+
+	test('bounds the whale cap exactly as the API does', () => {
+		const create = {
+			action: 'create',
+			organizationId,
+			idempotencyKey,
+			appId: configId,
+			key: 'paywall_test',
+		}
+		for (const whaleCapCents of [0, 1_000_000_001, 1.5, '50000']) {
+			expect(() =>
+				ManageExperimentsRequestSchema.parse({ ...create, whaleCapCents }),
+			).toThrow()
+		}
+		for (const whaleCapCents of [1, 1_000_000_000, null]) {
+			expect(
+				ManageExperimentsRequestSchema.parse({ ...create, whaleCapCents }),
+			).toMatchObject({ whaleCapCents })
+		}
+	})
+
+	test('rollout actions are strict and need their ids', () => {
+		const rollout = {
+			action: 'rollout_variant' as const,
+			organizationId,
+			idempotencyKey,
+			experimentId,
+			variantId: configId,
+		}
+		expect(ManageExperimentsRequestSchema.parse(rollout)).toEqual(rollout)
+		expect(() =>
+			ManageExperimentsRequestSchema.parse({
+				...rollout,
+				variantId: 'control',
+			}),
+		).toThrow()
+		expect(() =>
+			ManageExperimentsRequestSchema.parse({
+				...rollout,
+				idempotencyKey: undefined,
+			}),
+		).toThrow()
+		expect(() =>
+			ManageExperimentsRequestSchema.parse({
+				...rollout,
+				expectedUpdatedAt: 'yesterday',
+			}),
+		).toThrow()
+		const clear = {
+			action: 'clear_rollout' as const,
+			organizationId,
+			idempotencyKey,
+			experimentId,
+			expectedUpdatedAt: timestamp,
+		}
+		expect(ManageExperimentsRequestSchema.parse(clear)).toEqual(clear)
+		expect(() =>
+			ManageExperimentsRequestSchema.parse({ ...clear, force: true }),
 		).toThrow()
 	})
 
