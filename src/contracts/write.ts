@@ -1,4 +1,9 @@
 import { z } from 'zod'
+import {
+	PACKAGE_LOOKUP_KEY_MAX_LENGTH,
+	PACKAGE_LOOKUP_KEY_MESSAGE,
+	PACKAGE_LOOKUP_KEY_PATTERN,
+} from './package-lookup-key.generated'
 
 const OrganizationId = z.uuid()
 const ResourceId = z.uuid()
@@ -28,20 +33,19 @@ const PackageType = z.enum([
 ])
 
 /**
- * Mirrors `PackageLookupKeySchema` in the API (src/types/admin.ts), which in turn
- * takes its charset from `keyPattern` in the XML screen DSL -- so a key accepted
- * here is one a screen document can write down. Rejecting it at this edge gives
- * the caller the rule instead of a bare 400 from upstream.
+ * Generated from the canonical rule in `AppActor-XML-AST` (Plan 8-12) and verified
+ * by `tests/package-lookup-key-parity.test.ts` so every key accepted here matches
+ * XML, API, and dashboard without drifting.
  */
 const PackageLookupKey = z
 	.string()
 	.trim()
-	.min(1)
-	.max(100)
-	.regex(
-		/^[a-zA-Z0-9$][a-zA-Z0-9._$-]*$/,
-		'Package key must start with a letter, digit or $ and use only letters, digits, dot, underscore, dash or $.',
+	.min(1, 'Package key is required.')
+	.max(
+		PACKAGE_LOOKUP_KEY_MAX_LENGTH,
+		`Package key must be at most ${PACKAGE_LOOKUP_KEY_MAX_LENGTH} characters.`,
 	)
+	.regex(PACKAGE_LOOKUP_KEY_PATTERN, PACKAGE_LOOKUP_KEY_MESSAGE)
 
 const ImportedProduct = z
 	.object({
@@ -161,7 +165,7 @@ export const ManagePackagesRequestSchema = z.discriminatedUnion('action', [
 			idempotencyKey: IdempotencyKey,
 			offeringId: ResourceId,
 			packageType: PackageType,
-			lookupKey: PackageLookupKey.nullable().optional(),
+			lookupKey: PackageLookupKey.optional(),
 			displayName: z.string().min(1).max(255),
 			position: z.number().int().min(0).optional(),
 			isActive: z.boolean().optional(),
@@ -175,7 +179,7 @@ export const ManagePackagesRequestSchema = z.discriminatedUnion('action', [
 			idempotencyKey: IdempotencyKey,
 			packageId: ResourceId,
 			packageType: PackageType.optional(),
-			lookupKey: PackageLookupKey.nullable().optional(),
+			lookupKey: PackageLookupKey.optional(),
 			displayName: z.string().min(1).max(255).optional(),
 			position: z.number().int().min(0).optional(),
 			isActive: z.boolean().optional(),
