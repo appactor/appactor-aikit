@@ -33,22 +33,17 @@ import {
 } from '../tool-runtime'
 
 /**
- * The API keeps no idempotency ledger for Apple Ads writes: nothing is
- * replayed, nothing is audited, and a `create` re-sent after a timeout can
- * create the object twice. The key is still sent so the ledger can be added
- * on the API side without a contract change here. Stated once and composed
- * into the descriptions, the annotations and the retry advice, so the three
- * cannot drift apart.
+ * Apple Ads writes run through the API's `mcp_write_operations` idempotency
+ * ledger: re-sending a succeeded `idempotencyKey` replays the stored result,
+ * and retrying a timed-out `create` with the same key recovers the existing
+ * Apple Ads object by unique name/keyword instead of failing or duplicating it
+ * (Apple Ads enforces unique campaign/adgroup names and rejects duplicate
+ * keywords).
  */
-export const APPLE_ADS_NO_LEDGER_RULE =
-	'idempotencyKey is required but the API keeps no ledger for Apple Ads writes: a repeated create is sent to Apple again and creates the object twice, so after a timeout read the list and re-send only if it is missing.'
+export const APPLE_ADS_IDEMPOTENCY_RULE =
+	'Idempotent via idempotencyKey (backed by the API write ledger): replaying a succeeded key returns the stored result, and retrying a timed-out create with the same key recovers the existing Apple Ads object by name/keyword instead of creating a duplicate.'
 
-const APPLE_ADS_WRITE_ANNOTATIONS = writeToolAnnotations(true, true, false)
-
-/** Only `create` adds an object; every other action sets a state and is safe to repeat. */
-function isRetryableAppleAdsAction(action: string) {
-	return action !== 'create'
-}
+const APPLE_ADS_WRITE_ANNOTATIONS = writeToolAnnotations(true, true)
 
 export function registerAppleAdsTools(
 	server: McpServer,
@@ -176,7 +171,7 @@ export function registerAppleAdsTools(
 		'manage_apple_ads_campaigns',
 		{
 			title: 'Manage Apple Ads Campaigns',
-			description: `Create, update (budget/name), pause, resume, or delete a campaign on Apple Search Ads. ${APPLE_ADS_NO_LEDGER_RULE}`,
+			description: `Create, update (budget/name), pause, resume, or delete a campaign on Apple Search Ads. ${APPLE_ADS_IDEMPOTENCY_RULE}`,
 			inputSchema: ManageAppleAdsCampaignRequestSchema,
 			outputSchema: ManageAppleAdsCampaignResponseSchema,
 			annotations: APPLE_ADS_WRITE_ANNOTATIONS,
@@ -194,7 +189,7 @@ export function registerAppleAdsTools(
 					`Campaign ${request.action} succeeded${replay}: ID ${data.campaignId ?? 'n/a'}, status ${data.status ?? 'SUCCESS'}.`,
 				)
 			} catch (error) {
-				return errorResult(error, isRetryableAppleAdsAction(request.action))
+				return errorResult(error, true)
 			}
 		},
 	)
@@ -235,7 +230,7 @@ export function registerAppleAdsTools(
 		'manage_apple_ads_adgroups',
 		{
 			title: 'Manage Apple Ads AdGroups',
-			description: `Create, update bid/CPA, pause, resume, or delete an adgroup on Apple Search Ads. ${APPLE_ADS_NO_LEDGER_RULE}`,
+			description: `Create, update bid/CPA, pause, resume, or delete an adgroup on Apple Search Ads. ${APPLE_ADS_IDEMPOTENCY_RULE}`,
 			inputSchema: ManageAppleAdsAdGroupRequestSchema,
 			outputSchema: ManageAppleAdsAdGroupResponseSchema,
 			annotations: APPLE_ADS_WRITE_ANNOTATIONS,
@@ -253,7 +248,7 @@ export function registerAppleAdsTools(
 					`AdGroup ${request.action} succeeded${replay}: ID ${data.adGroupId ?? 'n/a'}, status ${data.status ?? 'SUCCESS'}.`,
 				)
 			} catch (error) {
-				return errorResult(error, isRetryableAppleAdsAction(request.action))
+				return errorResult(error, true)
 			}
 		},
 	)
@@ -294,7 +289,7 @@ export function registerAppleAdsTools(
 		'manage_apple_ads_keywords',
 		{
 			title: 'Manage Apple Ads Targeting Keywords',
-			description: `Create targeting keywords, update bids, pause, resume, or delete keywords on Apple Search Ads. ${APPLE_ADS_NO_LEDGER_RULE}`,
+			description: `Create targeting keywords, update bids, pause, resume, or delete keywords on Apple Search Ads. ${APPLE_ADS_IDEMPOTENCY_RULE}`,
 			inputSchema: ManageAppleAdsKeywordRequestSchema,
 			outputSchema: ManageAppleAdsKeywordResponseSchema,
 			annotations: APPLE_ADS_WRITE_ANNOTATIONS,
@@ -312,7 +307,7 @@ export function registerAppleAdsTools(
 					`Keyword ${request.action} succeeded${replay}: ID ${data.keywordId ?? 'n/a'}, status ${data.status ?? 'SUCCESS'}.`,
 				)
 			} catch (error) {
-				return errorResult(error, isRetryableAppleAdsAction(request.action))
+				return errorResult(error, true)
 			}
 		},
 	)
@@ -350,7 +345,7 @@ export function registerAppleAdsTools(
 		'manage_apple_ads_negative_keywords',
 		{
 			title: 'Manage Apple Ads Negative Keywords',
-			description: `Add or delete negative keywords at campaign or adgroup level on Apple Search Ads. ${APPLE_ADS_NO_LEDGER_RULE}`,
+			description: `Add or delete negative keywords at campaign or adgroup level on Apple Search Ads. ${APPLE_ADS_IDEMPOTENCY_RULE}`,
 			inputSchema: ManageAppleAdsNegativeKeywordRequestSchema,
 			outputSchema: ManageAppleAdsNegativeKeywordResponseSchema,
 			annotations: APPLE_ADS_WRITE_ANNOTATIONS,
@@ -368,7 +363,7 @@ export function registerAppleAdsTools(
 					`Negative keyword ${request.action} succeeded${replay}: ID ${data.negativeKeywordId ?? 'n/a'}, status ${data.status ?? 'SUCCESS'}.`,
 				)
 			} catch (error) {
-				return errorResult(error, isRetryableAppleAdsAction(request.action))
+				return errorResult(error, true)
 			}
 		},
 	)

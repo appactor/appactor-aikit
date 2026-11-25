@@ -625,9 +625,9 @@ describe('Apple Ads MCP tools', () => {
 		expect(response.status).toBe(403)
 	})
 
-	// The API keeps no ledger for Apple Ads writes, so the "retry with the same
-	// key" advice errorResult attaches to an uncertain outcome is only true of
-	// the actions that set a state. A re-sent create creates the object twice.
+	// Apple Ads writes are backed by the API idempotency ledger and recover
+	// existing objects on duplicate errors after a timeout, so every action
+	// (including create) receives "retry with the same idempotencyKey" advice.
 	describe('retry advice on an uncertain outcome', () => {
 		const upstreamDown = async () =>
 			Response.json(
@@ -660,7 +660,7 @@ describe('Apple Ads MCP tools', () => {
 			}
 		}
 
-		test('is withheld from create', async () => {
+		test('is given for create (idempotent ledger + duplicate recovery)', async () => {
 			const result = await manageCampaign({
 				organizationId: ORGANIZATION_ID,
 				action: 'create',
@@ -671,7 +671,7 @@ describe('Apple Ads MCP tools', () => {
 				adamId: 123456,
 			})
 			expect(result.isError).toBe(true)
-			expect(result.content[0].text).not.toContain('same idempotencyKey')
+			expect(result.content[0].text).toContain('same idempotencyKey')
 		})
 
 		test('is given for a state-setting action', async () => {
@@ -684,5 +684,35 @@ describe('Apple Ads MCP tools', () => {
 			expect(result.isError).toBe(true)
 			expect(result.content[0].text).toContain('same idempotencyKey')
 		})
+	})
+
+	test('manage_apple_ads_* descriptions accurately document idempotency without duplicate-creation warnings', async () => {
+		const fixture = await createMcpAppFixture()
+		const token = await issueAccessToken(fixture, 'workspace:read')
+		const response = await mcpRpc(
+			fixture,
+			token,
+			'tools/list',
+			{ _meta: modernMeta() },
+			'list-apple-ads-tools',
+		)
+		expect(response.status).toBe(200)
+		const body = (await response.json()) as {
+			result?: { tools: Array<{ name: string; description?: string }> }
+		}
+		const writeTools = (body.result?.tools ?? []).filter((tool) =>
+			tool.name.startsWith('manage_apple_ads_'),
+		)
+		expect(writeTools.map((t) => t.name).sort()).toEqual([
+			'manage_apple_ads_adgroups',
+			'manage_apple_ads_campaigns',
+			'manage_apple_ads_keywords',
+			'manage_apple_ads_negative_keywords',
+		])
+		for (const tool of writeTools) {
+			expect(tool.description).toContain('idempotencyKey')
+			expect(tool.description).not.toContain('creates the object twice')
+			expect(tool.description).not.toContain('keeps no ledger')
+		}
 	})
 })

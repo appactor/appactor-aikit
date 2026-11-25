@@ -204,27 +204,23 @@ describe('MCP controlled write tools', () => {
 			// The write never leaves AppActor -- Apple is consulted later, when a refund request
 			// actually arrives -- but it overwrites a policy that decides where money goes.
 			manage_refund_saver: { destructiveHint: true, openWorldHint: false },
-			// The API keeps no ledger for Apple Ads writes (see
-			// APPLE_ADS_NO_LEDGER_RULE), so a host must not auto-retry them.
+			// Apple Ads writes are backed by the API idempotency ledger and
+			// recover existing objects on duplicate/already-exists retries.
 			manage_apple_ads_campaigns: {
 				destructiveHint: true,
 				openWorldHint: true,
-				idempotentHint: false,
 			},
 			manage_apple_ads_adgroups: {
 				destructiveHint: true,
 				openWorldHint: true,
-				idempotentHint: false,
 			},
 			manage_apple_ads_keywords: {
 				destructiveHint: true,
 				openWorldHint: true,
-				idempotentHint: false,
 			},
 			manage_apple_ads_negative_keywords: {
 				destructiveHint: true,
 				openWorldHint: true,
-				idempotentHint: false,
 			},
 		}
 
