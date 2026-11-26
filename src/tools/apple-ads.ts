@@ -35,17 +35,19 @@ import {
 /**
  * Apple Ads writes run through the API's `mcp_write_operations` idempotency
  * ledger (recorded in `get_audit_log`): re-sending a succeeded
- * `idempotencyKey` replays the stored result without calling Apple again, and
- * retrying an uncertain or timed-out `create` with the same key searches Apple
- * Ads for a recently created matching object before re-posting to avoid
+ * `idempotencyKey` replays the stored result without calling Apple again.
+ * Create calls never blindly re-POST on a 5xx or network timeout; retrying an
+ * uncertain or timed-out `create` with the same key searches Apple Ads for a
+ * recently created matching object before sending any second POST, avoiding
  * duplicates (the Apple Ads Platform API does not document campaign or ad group
  * name uniqueness, so generating a new key on an uncertain retry risks
  * duplicates). If retrying immediately after MCP's 35s timeout returns
  * `409 Conflict` while the first API request is still in flight, wait briefly
- * and retry with the same key.
+ * and retry with the same key (retrying after 5 minutes of inactivity
+ * transitions an interrupted `pending` record to `uncertain` and reclaims it).
  */
 export const APPLE_ADS_IDEMPOTENCY_RULE =
-	'Idempotent via idempotencyKey (backed by the API write ledger and visible in get_audit_log): replaying a succeeded key returns the stored result, and retrying an uncertain or timed-out create with the exact same idempotencyKey and arguments searches Apple Ads before re-posting to avoid duplicates. If retrying after MCP 35s timeout returns 409 Conflict (still in flight on API), wait briefly and retry with the same idempotencyKey — never generate a new key (Platform API does not guarantee name uniqueness).'
+	'Idempotent via idempotencyKey (backed by the API write ledger and visible in get_audit_log): replaying a succeeded key returns the stored result, and create calls never blindly re-POST on 5xx/network errors — any second POST only happens after searching Apple Ads for recently created objects when you retry the exact same idempotencyKey and arguments. If retrying after MCP 35s timeout returns 409 Conflict (still in flight on API), wait briefly and retry with the same idempotencyKey (retrying after 5 minutes of inactivity transitions an interrupted pending record to uncertain and reclaims it) — never generate a new key (Platform API does not guarantee name uniqueness).'
 
 const APPLE_ADS_WRITE_ANNOTATIONS = writeToolAnnotations(true, true)
 
@@ -293,7 +295,7 @@ export function registerAppleAdsTools(
 		'manage_apple_ads_keywords',
 		{
 			title: 'Manage Apple Ads Targeting Keywords',
-			description: `Create targeting keywords, update bids, pause, resume, or delete keywords on Apple Search Ads. ${APPLE_ADS_IDEMPOTENCY_RULE}`,
+			description: `Create targeting keywords (max 50 per call; if a batch fails partway through, the operation stays uncertain with already-created keyword IDs recorded in the error details and get_audit_log), update bids, pause, resume, or delete keywords on Apple Search Ads. ${APPLE_ADS_IDEMPOTENCY_RULE}`,
 			inputSchema: ManageAppleAdsKeywordRequestSchema,
 			outputSchema: ManageAppleAdsKeywordResponseSchema,
 			annotations: APPLE_ADS_WRITE_ANNOTATIONS,

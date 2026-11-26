@@ -91,18 +91,22 @@ What a retry with the same key actually does depends on what the server recorded
 |---|---|
 | succeeded | replays the stored result; no second mutation |
 | failed | rejected — the key is burned. Fix the input and use a **new** key |
-| pending | rejected as `409 Conflict` while still in flight (interrupted requests auto-transition to `uncertain` after 5 minutes) |
+| pending | rejected as `409 Conflict` while still in flight; when retried with the same key after 5 minutes of inactivity, the API transitions the interrupted record to `uncertain` (and reclaims it for `manage_apple_ads_*`) |
 | uncertain | rejected as a conflict for standard workspace writes; safely reclaimed for `manage_apple_ads_*` (see below) |
 
 The four `manage_apple_ads_*` tools also run through the `mcp_write_operations`
-ledger and appear in `get_audit_log`, with one extra recovery rule: after a
-timeout or `uncertain` failure, retrying the **same** `idempotencyKey` and
-identical arguments safely reclaims the entry and searches Apple Ads before
-re-posting any `create`. If an immediate retry after MCP's 35-second timeout
-returns `409 Conflict` because the first API call is still in flight
-(`pending`), wait briefly and retry with the **same** key — never generate a
-new key (the Apple Ads Platform API does not guarantee unique names, so a new
-key risks duplicates). See `appactor:asa`.
+ledger and appear in `get_audit_log`, with one extra recovery rule: create calls
+never blindly re-POST on a 5xx or network timeout — after an `uncertain`
+failure, retrying the **same** `idempotencyKey` and identical arguments safely
+reclaims the entry and searches Apple Ads before sending any second `POST`. If a
+multi-keyword `create` batch fails partway through, the entry stays `uncertain`
+with the already-created keyword IDs recorded in `get_audit_log`. If an
+immediate retry after MCP's 35-second timeout returns `409 Conflict` because the
+first API call is still in flight (`pending`), wait briefly and retry with the
+**same** key (retrying after 5 minutes of inactivity transitions an interrupted
+`pending` record to `uncertain` and reclaims it) — never generate a new key (the
+Apple Ads Platform API does not guarantee unique names, so a new key risks
+duplicates). See `appactor:asa`.
 
 For standard (non-Apple-Ads) workspace writes, a plain timeout is **not**
 something to retry your way out of. If the server recorded the operation as

@@ -94,17 +94,27 @@ like other workspace mutations:
 
 - Re-sending a `succeeded` key with the same arguments replays the stored
   result without calling Apple again.
-- After a timeout, 5xx, or other `uncertain` failure, **retry with the exact
-  same `idempotencyKey` and arguments** — never generate a fresh key. For
-  `create`, the API searches Apple Ads for a matching object created since the
-  original attempt started before sending a second `POST`, preventing
-  duplicates (the Apple Ads Platform API does not guarantee unique campaign or
-  ad group names, so a new key risks creating a duplicate).
+- Create calls never blindly re-POST on a 5xx or network timeout. After a
+  timeout, 5xx, or other `uncertain` failure, **retry with the exact same
+  `idempotencyKey` and arguments** — never generate a fresh key. On that retry,
+  the API searches Apple Ads for a matching object created since the original
+  attempt started before sending any second `POST`, preventing duplicates (the
+  Apple Ads Platform API does not guarantee unique campaign or ad group names,
+  so a new key risks creating a duplicate).
+- For batch targeting keyword creation (`manage_apple_ads_keywords` `create`,
+  up to 50 keywords per call), if one or more keywords succeed before a later
+  keyword fails, the entry stays `uncertain` (never `failed`) with the
+  already-created keyword IDs and failure details saved in the error response
+  and `get_audit_log`.
 - If an immediate retry after MCP's 35-second timeout returns `409 Conflict`
   because the first API request is still in flight, wait briefly and retry with
-  the **same** `idempotencyKey`; do not generate a new key.
-- A deterministic 4xx Apple refusal marks the entry `failed` and burns the key:
-  fix the inputs and use a **new** `idempotencyKey`.
+  the **same** `idempotencyKey`; do not generate a new key. If a request was
+  interrupted and stays inactive for 5 minutes, retrying with the same
+  `idempotencyKey` after 5 minutes of inactivity transitions the interrupted
+  `pending` record to `uncertain` and reclaims/recovers it.
+- A deterministic 4xx Apple refusal on a clean single-item attempt marks the
+  entry `failed` and burns the key: fix the inputs and use a **new**
+  `idempotencyKey`.
 - `update`, `update_bid`, `pause`, `resume` and `delete` set a state and are
   safe to repeat with the same key.
 

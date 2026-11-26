@@ -721,10 +721,18 @@ describe('Apple Ads MCP tools', () => {
 			expect(tool.description).toContain('idempotencyKey')
 			expect(tool.description).toContain('409 Conflict')
 			expect(tool.description).toContain('get_audit_log')
+			expect(tool.description).toContain('never blindly re-POST')
+			expect(tool.description).toContain('5 minutes of inactivity')
 			expect(tool.description).not.toContain('creates the object twice')
 			expect(tool.description).not.toContain('keeps no ledger')
 			expect(tool.description).not.toContain('enforces unique')
+			expect(tool.description).not.toContain('auto-transition')
 		}
+		const kwTool = writeTools.find(
+			(t) => t.name === 'manage_apple_ads_keywords',
+		)
+		expect(kwTool?.description).toContain('max 50 per call')
+		expect(kwTool?.description).toContain('already-created keyword IDs')
 		const negTool = writeTools.find(
 			(t) => t.name === 'manage_apple_ads_negative_keywords',
 		)
@@ -795,9 +803,12 @@ describe('Apple Ads MCP tools', () => {
 		for (const skill of [asaSkill, workspaceSkill]) {
 			expect(skill).not.toContain('keeps no ledger')
 			expect(skill).not.toContain('creates two')
+			expect(skill).not.toContain('auto-transition')
 			expect(skill).toContain('mcp_write_operations')
 			expect(skill).toContain('get_audit_log')
 			expect(skill).toContain('409 Conflict')
+			expect(skill).toContain('never blindly re-POST')
+			expect(skill).toContain('5 minutes of inactivity')
 		}
 
 		const pkg = JSON.parse(
