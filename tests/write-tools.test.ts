@@ -205,7 +205,7 @@ describe('MCP controlled write tools', () => {
 			// actually arrives -- but it overwrites a policy that decides where money goes.
 			manage_refund_saver: { destructiveHint: true, openWorldHint: false },
 			// Apple Ads writes are backed by the API idempotency ledger and
-			// recover existing objects on duplicate/already-exists retries.
+			// search Apple Ads before re-posting on uncertain create retries.
 			manage_apple_ads_campaigns: {
 				destructiveHint: true,
 				openWorldHint: true,

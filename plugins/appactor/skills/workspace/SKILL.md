@@ -91,19 +91,26 @@ What a retry with the same key actually does depends on what the server recorded
 |---|---|
 | succeeded | replays the stored result; no second mutation |
 | failed | rejected — the key is burned. Fix the input and use a **new** key |
-| pending | rejected as a conflict: the operation is still in flight or was interrupted |
-| uncertain | rejected as a conflict: the outcome could not be confirmed |
+| pending | rejected as `409 Conflict` while still in flight (interrupted requests auto-transition to `uncertain` after 5 minutes) |
+| uncertain | rejected as a conflict for standard workspace writes; safely reclaimed for `manage_apple_ads_*` (see below) |
 
-The four `manage_apple_ads_*` tools are the exception to this table: the API
-keeps no ledger for them, so a retry is a second call to Apple — see
-`appactor:asa`.
+The four `manage_apple_ads_*` tools also run through the `mcp_write_operations`
+ledger and appear in `get_audit_log`, with one extra recovery rule: after a
+timeout or `uncertain` failure, retrying the **same** `idempotencyKey` and
+identical arguments safely reclaims the entry and searches Apple Ads before
+re-posting any `create`. If an immediate retry after MCP's 35-second timeout
+returns `409 Conflict` because the first API call is still in flight
+(`pending`), wait briefly and retry with the **same** key — never generate a
+new key (the Apple Ads Platform API does not guarantee unique names, so a new
+key risks duplicates). See `appactor:asa`.
 
-So a plain timeout is **not** something to retry your way out of. If the server
-recorded the operation as uncertain, retrying the same key returns a conflict and
-a new key risks a duplicate write. Stop, report the conflict message to the user,
-and check the resource's real state with the matching read tool before doing
-anything else. `get_audit_log` shows the ledger entry, including whether it
-ended `pending` or `uncertain`.
+For standard (non-Apple-Ads) workspace writes, a plain timeout is **not**
+something to retry your way out of. If the server recorded the operation as
+`uncertain`, retrying the same key returns a conflict and a new key risks a
+duplicate write. Stop, report the conflict message to the user, and check the
+resource's real state with the matching read tool before doing anything else.
+`get_audit_log` shows the ledger entry, including whether it ended `pending` or
+`uncertain`.
 
 ## Publishing an offering: preview, then apply
 

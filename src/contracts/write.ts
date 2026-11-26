@@ -7,7 +7,7 @@ import {
 
 const OrganizationId = z.uuid()
 const ResourceId = z.uuid()
-const IdempotencyKey = z
+export const IdempotencyKey = z
 	.string()
 	.min(8)
 	.max(255)

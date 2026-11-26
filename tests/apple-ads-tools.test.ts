@@ -1,5 +1,13 @@
 import { afterEach, describe, expect, test } from 'bun:test'
+import { readFileSync } from 'node:fs'
+import { resolve } from 'node:path'
 import { jwtVerify } from 'jose'
+import {
+	ManageAppleAdsAdGroupRequestSchema,
+	ManageAppleAdsCampaignRequestSchema,
+	ManageAppleAdsKeywordRequestSchema,
+	ManageAppleAdsNegativeKeywordRequestSchema,
+} from '../src/contracts/apple-ads'
 import {
 	createMcpAppFixture,
 	issueAccessToken,
@@ -625,9 +633,9 @@ describe('Apple Ads MCP tools', () => {
 		expect(response.status).toBe(403)
 	})
 
-	// Apple Ads writes are backed by the API idempotency ledger and recover
-	// existing objects on duplicate errors after a timeout, so every action
-	// (including create) receives "retry with the same idempotencyKey" advice.
+	// Apple Ads writes are backed by the API idempotency ledger and search Apple Ads
+	// before re-posting on uncertain create retries, so every action (including create)
+	// receives "retry with the same idempotencyKey" advice.
 	describe('retry advice on an uncertain outcome', () => {
 		const upstreamDown = async () =>
 			Response.json(
@@ -711,8 +719,97 @@ describe('Apple Ads MCP tools', () => {
 		])
 		for (const tool of writeTools) {
 			expect(tool.description).toContain('idempotencyKey')
+			expect(tool.description).toContain('409 Conflict')
+			expect(tool.description).toContain('get_audit_log')
 			expect(tool.description).not.toContain('creates the object twice')
 			expect(tool.description).not.toContain('keeps no ledger')
+			expect(tool.description).not.toContain('enforces unique')
 		}
+		const negTool = writeTools.find(
+			(t) => t.name === 'manage_apple_ads_negative_keywords',
+		)
+		expect(negTool?.description).toContain('adGroupId IS_NULL')
+	})
+
+	test('Apple Ads write schemas share strict IdempotencyKey validation', () => {
+		const cases = [
+			{
+				schema: ManageAppleAdsCampaignRequestSchema,
+				base: {
+					organizationId: ORGANIZATION_ID,
+					action: 'pause' as const,
+					campaignId: 101,
+				},
+			},
+			{
+				schema: ManageAppleAdsAdGroupRequestSchema,
+				base: {
+					organizationId: ORGANIZATION_ID,
+					action: 'pause' as const,
+					adGroupId: 201,
+				},
+			},
+			{
+				schema: ManageAppleAdsKeywordRequestSchema,
+				base: {
+					organizationId: ORGANIZATION_ID,
+					action: 'pause' as const,
+					keywordId: 301,
+				},
+			},
+			{
+				schema: ManageAppleAdsNegativeKeywordRequestSchema,
+				base: {
+					organizationId: ORGANIZATION_ID,
+					action: 'delete' as const,
+					negativeKeywordId: 401,
+				},
+			},
+		]
+
+		for (const { schema, base } of cases) {
+			expect(
+				schema.safeParse({ ...base, idempotencyKey: 'short' }).success,
+			).toBe(false)
+			expect(
+				schema.safeParse({ ...base, idempotencyKey: 'bad key with spaces!' })
+					.success,
+			).toBe(false)
+			expect(
+				schema.safeParse({ ...base, idempotencyKey: 'valid-key_01:ok' })
+					.success,
+			).toBe(true)
+		}
+	})
+
+	test('ASA and workspace skills and plugin versions align with Apple Ads write ledger', () => {
+		const root = resolve(import.meta.dir, '..')
+		const asaSkill = readFileSync(
+			resolve(root, 'plugins/appactor/skills/asa/SKILL.md'),
+			'utf8',
+		)
+		const workspaceSkill = readFileSync(
+			resolve(root, 'plugins/appactor/skills/workspace/SKILL.md'),
+			'utf8',
+		)
+		for (const skill of [asaSkill, workspaceSkill]) {
+			expect(skill).not.toContain('keeps no ledger')
+			expect(skill).not.toContain('creates two')
+			expect(skill).toContain('mcp_write_operations')
+			expect(skill).toContain('get_audit_log')
+			expect(skill).toContain('409 Conflict')
+		}
+
+		const pkg = JSON.parse(
+			readFileSync(resolve(root, 'package.json'), 'utf8'),
+		) as { version: string }
+		const plugin = JSON.parse(
+			readFileSync(
+				resolve(root, 'plugins/appactor/.claude-plugin/plugin.json'),
+				'utf8',
+			),
+		) as { version: string }
+		expect(pkg.version).toBe('0.6.2')
+		expect(plugin.version).toBe(pkg.version)
 	})
 })

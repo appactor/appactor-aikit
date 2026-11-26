@@ -34,14 +34,18 @@ import {
 
 /**
  * Apple Ads writes run through the API's `mcp_write_operations` idempotency
- * ledger: re-sending a succeeded `idempotencyKey` replays the stored result,
- * and retrying a timed-out `create` with the same key recovers the existing
- * Apple Ads object by unique name/keyword instead of failing or duplicating it
- * (Apple Ads enforces unique campaign/adgroup names and rejects duplicate
- * keywords).
+ * ledger (recorded in `get_audit_log`): re-sending a succeeded
+ * `idempotencyKey` replays the stored result without calling Apple again, and
+ * retrying an uncertain or timed-out `create` with the same key searches Apple
+ * Ads for a recently created matching object before re-posting to avoid
+ * duplicates (the Apple Ads Platform API does not document campaign or ad group
+ * name uniqueness, so generating a new key on an uncertain retry risks
+ * duplicates). If retrying immediately after MCP's 35s timeout returns
+ * `409 Conflict` while the first API request is still in flight, wait briefly
+ * and retry with the same key.
  */
 export const APPLE_ADS_IDEMPOTENCY_RULE =
-	'Idempotent via idempotencyKey (backed by the API write ledger): replaying a succeeded key returns the stored result, and retrying a timed-out create with the same key recovers the existing Apple Ads object by name/keyword instead of creating a duplicate.'
+	'Idempotent via idempotencyKey (backed by the API write ledger and visible in get_audit_log): replaying a succeeded key returns the stored result, and retrying an uncertain or timed-out create with the exact same idempotencyKey and arguments searches Apple Ads before re-posting to avoid duplicates. If retrying after MCP 35s timeout returns 409 Conflict (still in flight on API), wait briefly and retry with the same idempotencyKey — never generate a new key (Platform API does not guarantee name uniqueness).'
 
 const APPLE_ADS_WRITE_ANNOTATIONS = writeToolAnnotations(true, true)
 
@@ -345,7 +349,7 @@ export function registerAppleAdsTools(
 		'manage_apple_ads_negative_keywords',
 		{
 			title: 'Manage Apple Ads Negative Keywords',
-			description: `Add or delete negative keywords at campaign or adgroup level on Apple Search Ads. ${APPLE_ADS_IDEMPOTENCY_RULE}`,
+			description: `Add or delete negative keywords at campaign level (pass campaignId without adGroupId; uncertain retries match campaignId with adGroupId IS_NULL) or adgroup level (pass campaignId and adGroupId) on Apple Search Ads. ${APPLE_ADS_IDEMPOTENCY_RULE}`,
 			inputSchema: ManageAppleAdsNegativeKeywordRequestSchema,
 			outputSchema: ManageAppleAdsNegativeKeywordResponseSchema,
 			annotations: APPLE_ADS_WRITE_ANNOTATIONS,

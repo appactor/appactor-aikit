@@ -87,13 +87,26 @@ covers what an `insufficient_scope` 403 means.
 
 ## Writing
 
-Every `manage_*` call takes an `action` and an `idempotencyKey`, **but the API
-keeps no ledger for Apple Ads writes**: a repeated call is sent to Apple again,
-nothing is replayed, and `get_audit_log` does not record it. A `create` that
-failed with a timeout or a 5xx may or may not have reached Apple — read the
-list first and re-send only if the object is not there; sending it twice
-creates two. `update`, `update_bid`, `pause`, `resume` and `delete` set a state
-and are safe to repeat.
+Every `manage_*` call takes an `action` and an `idempotencyKey` (at least 8
+characters matching `[A-Za-z0-9._:-]`) and runs through the API's
+`mcp_write_operations` ledger — `get_audit_log` records Apple Ads writes just
+like other workspace mutations:
+
+- Re-sending a `succeeded` key with the same arguments replays the stored
+  result without calling Apple again.
+- After a timeout, 5xx, or other `uncertain` failure, **retry with the exact
+  same `idempotencyKey` and arguments** — never generate a fresh key. For
+  `create`, the API searches Apple Ads for a matching object created since the
+  original attempt started before sending a second `POST`, preventing
+  duplicates (the Apple Ads Platform API does not guarantee unique campaign or
+  ad group names, so a new key risks creating a duplicate).
+- If an immediate retry after MCP's 35-second timeout returns `409 Conflict`
+  because the first API request is still in flight, wait briefly and retry with
+  the **same** `idempotencyKey`; do not generate a new key.
+- A deterministic 4xx Apple refusal marks the entry `failed` and burns the key:
+  fix the inputs and use a **new** `idempotencyKey`.
+- `update`, `update_bid`, `pause`, `resume` and `delete` set a state and are
+  safe to repeat with the same key.
 
 `update` is a partial update, as `update_app` in `appactor:workspace`: a field
 you omit is never written. It also accepts `status: "ENABLED" | "PAUSED"`,

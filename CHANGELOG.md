@@ -1,5 +1,27 @@
 # Changelog
 
+## 0.6.2
+
+- **Apple Ads writes are backed by the API idempotency ledger.** The four
+  `manage_apple_ads_*` tools now record writes in `mcp_write_operations` (and
+  appear in `get_audit_log`), replay succeeded keys without calling Apple again,
+  and on uncertain or timed-out `create` retries search Apple Ads for a recently
+  created matching object before re-posting.
+- **Shared `IdempotencyKey` schema across all write tools.** All 17 Apple Ads
+  write actions now validate `idempotencyKey` with the same `IdempotencyKey`
+  contract (`min(8).max(255).regex(/^[A-Za-z0-9._:-]+$/)`) used by every other
+  MCP write tool and `appactor-api`.
+- **In-flight `409 Conflict` retry guidance and Platform API accuracy.** Tool
+  descriptions, `appactor:asa`, and `appactor:workspace` now remove the outdated
+  "keeps no ledger / creates two" and v5 name-uniqueness claims, document that
+  an immediate retry after MCP's 35s timeout may return `409 Conflict` while the
+  first API call is still in flight (wait briefly and retry with the same
+  `idempotencyKey`, never generate a new key), and align campaign-level negative
+  keyword descriptions with the API's `campaignId` + `adGroupId IS_NULL` lookup.
+- Requires `appactor-final-api` PR `#833` (`feat/faz9-9-06-asa-fixes`).
+  **Deploy the API first:** an older API does not back Apple Ads writes with the
+  `mcp_write_operations` ledger.
+
 ## 0.6.1
 
 - Experiment tools and the experiment skill now explain which users count

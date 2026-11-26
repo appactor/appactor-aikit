@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { IdempotencyKey } from './write'
 
 const EntityId = z.union([
 	z.number().int().positive(),
@@ -176,7 +177,7 @@ export const ManageAppleAdsCampaignRequestSchema = z.discriminatedUnion(
 	[
 		AppleAdsSelectorSchema.extend({
 			action: z.literal('create'),
-			idempotencyKey: z.string().min(1),
+			idempotencyKey: IdempotencyKey,
 			name: z.string().min(1).max(255),
 			dailyBudget: z.number().positive(),
 			currency: z.string().length(3).default('USD'),
@@ -188,7 +189,7 @@ export const ManageAppleAdsCampaignRequestSchema = z.discriminatedUnion(
 		}),
 		AppleAdsSelectorSchema.extend({
 			action: z.literal('update'),
-			idempotencyKey: z.string().min(1),
+			idempotencyKey: IdempotencyKey,
 			campaignId: EntityId,
 			name: z.string().min(1).max(255).optional(),
 			dailyBudget: z.number().positive().optional(),
@@ -197,17 +198,17 @@ export const ManageAppleAdsCampaignRequestSchema = z.discriminatedUnion(
 		}),
 		AppleAdsSelectorSchema.extend({
 			action: z.literal('pause'),
-			idempotencyKey: z.string().min(1),
+			idempotencyKey: IdempotencyKey,
 			campaignId: EntityId,
 		}),
 		AppleAdsSelectorSchema.extend({
 			action: z.literal('resume'),
-			idempotencyKey: z.string().min(1),
+			idempotencyKey: IdempotencyKey,
 			campaignId: EntityId,
 		}),
 		AppleAdsSelectorSchema.extend({
 			action: z.literal('delete'),
-			idempotencyKey: z.string().min(1),
+			idempotencyKey: IdempotencyKey,
 			campaignId: EntityId,
 		}),
 	],
@@ -272,7 +273,7 @@ export const ManageAppleAdsAdGroupRequestSchema = z.discriminatedUnion(
 	[
 		AppleAdsSelectorSchema.extend({
 			action: z.literal('create'),
-			idempotencyKey: z.string().min(1),
+			idempotencyKey: IdempotencyKey,
 			campaignId: EntityId,
 			name: z.string().min(1).max(255),
 			defaultBid: z.number().positive(),
@@ -285,7 +286,7 @@ export const ManageAppleAdsAdGroupRequestSchema = z.discriminatedUnion(
 		}),
 		AppleAdsSelectorSchema.extend({
 			action: z.literal('update'),
-			idempotencyKey: z.string().min(1),
+			idempotencyKey: IdempotencyKey,
 			adGroupId: EntityId,
 			name: z.string().min(1).max(255).optional(),
 			defaultBid: z.number().positive().optional(),
@@ -295,17 +296,17 @@ export const ManageAppleAdsAdGroupRequestSchema = z.discriminatedUnion(
 		}),
 		AppleAdsSelectorSchema.extend({
 			action: z.literal('pause'),
-			idempotencyKey: z.string().min(1),
+			idempotencyKey: IdempotencyKey,
 			adGroupId: EntityId,
 		}),
 		AppleAdsSelectorSchema.extend({
 			action: z.literal('resume'),
-			idempotencyKey: z.string().min(1),
+			idempotencyKey: IdempotencyKey,
 			adGroupId: EntityId,
 		}),
 		AppleAdsSelectorSchema.extend({
 			action: z.literal('delete'),
-			idempotencyKey: z.string().min(1),
+			idempotencyKey: IdempotencyKey,
 			adGroupId: EntityId,
 		}),
 	],
@@ -370,7 +371,7 @@ export const ManageAppleAdsKeywordRequestSchema = z.discriminatedUnion(
 	[
 		AppleAdsSelectorSchema.extend({
 			action: z.literal('create'),
-			idempotencyKey: z.string().min(1),
+			idempotencyKey: IdempotencyKey,
 			adGroupId: EntityId,
 			text: z.string().min(1),
 			bid: z.number().positive(),
@@ -380,24 +381,24 @@ export const ManageAppleAdsKeywordRequestSchema = z.discriminatedUnion(
 		}),
 		AppleAdsSelectorSchema.extend({
 			action: z.literal('update_bid'),
-			idempotencyKey: z.string().min(1),
+			idempotencyKey: IdempotencyKey,
 			keywordId: EntityId,
 			bid: z.number().positive(),
 			currency: z.string().length(3).default('USD'),
 		}),
 		AppleAdsSelectorSchema.extend({
 			action: z.literal('pause'),
-			idempotencyKey: z.string().min(1),
+			idempotencyKey: IdempotencyKey,
 			keywordId: EntityId,
 		}),
 		AppleAdsSelectorSchema.extend({
 			action: z.literal('resume'),
-			idempotencyKey: z.string().min(1),
+			idempotencyKey: IdempotencyKey,
 			keywordId: EntityId,
 		}),
 		AppleAdsSelectorSchema.extend({
 			action: z.literal('delete'),
-			idempotencyKey: z.string().min(1),
+			idempotencyKey: IdempotencyKey,
 			keywordId: EntityId,
 		}),
 	],
@@ -463,15 +464,19 @@ export const ManageAppleAdsNegativeKeywordRequestSchema = z.discriminatedUnion(
 	[
 		AppleAdsSelectorSchema.extend({
 			action: z.literal('create'),
-			idempotencyKey: z.string().min(1),
+			idempotencyKey: IdempotencyKey,
 			text: z.string().min(1),
 			matchType: MatchTypeEnum.default('EXACT'),
-			campaignId: EntityId,
-			adGroupId: EntityId.optional(),
+			campaignId: EntityId.describe(
+				'Campaign ID. Omit adGroupId to create a campaign-level negative keyword, or pass adGroupId as well to scope it to one ad group.',
+			),
+			adGroupId: EntityId.optional().describe(
+				'Optional ad group ID. Omit for a campaign-level negative keyword (matched by campaignId with adGroupId IS_NULL on uncertain retries); pass with campaignId for an adgroup-level negative keyword.',
+			),
 		}),
 		AppleAdsSelectorSchema.extend({
 			action: z.literal('delete'),
-			idempotencyKey: z.string().min(1),
+			idempotencyKey: IdempotencyKey,
 			negativeKeywordId: EntityId,
 			campaignId: EntityId.optional(),
 			adGroupId: EntityId.optional(),
