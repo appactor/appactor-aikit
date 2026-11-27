@@ -176,6 +176,8 @@ export const appleAdsAdGroupDeleteImpact = {
 	campaignId: 101,
 	campaignName: 'Brand US',
 	targetingKeywords: { count: 1000, atLeast: true },
+	cascades:
+		'Apple deletes the ad group together with its keywords and ads. It cannot be undone.',
 }
 
 /**
@@ -185,7 +187,14 @@ export const appleAdsAdGroupDeleteImpact = {
 const appleAdsDeleteTargets = {
 	campaign: {
 		targetId: 101,
-		impact: { status: 'ENABLED', adGroups: { count: 3, atLeast: false } },
+		impact: {
+			status: 'ENABLED',
+			dailyBudget: 50,
+			currency: 'EUR',
+			adGroups: { count: 3, atLeast: false },
+			cascades:
+				'Apple deletes the campaign together with its ad groups, keywords and ads. It cannot be undone.',
+		},
 	},
 	adgroup: { targetId: 201, impact: appleAdsAdGroupDeleteImpact },
 } as const
@@ -217,6 +226,10 @@ export function appleAdsDeleteOutcome(
 			target,
 			targetId: appleAdsDeleteTargets[target].targetId,
 			name,
+			// The API sends the before-state only when something was actually deleted.
+			...(overrides.alreadyAbsent
+				? {}
+				: { previous: { id: appleAdsDeleteTargets[target].targetId, name } }),
 		},
 		overrides.replayed ?? false,
 	)

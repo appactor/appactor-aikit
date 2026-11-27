@@ -93,12 +93,12 @@ function appleAdsDeleteSummary(
 			result.result,
 			result.replayed,
 		)
-	const target = `the ${APPLE_ADS_DELETE_LABEL[result.target]} "${result.name}" (ID ${result.targetId}, ${result.impact.status})`
-	return deletePreviewSummary(
+	const target = `the ${APPLE_ADS_DELETE_LABEL[result.target]} "${result.name}" (ID ${result.targetId}, ${result.impact.status}`
+	const what =
 		result.target === 'campaign'
-			? `Deleting ${target} permanently deletes it and its ${countLabel(result.impact.adGroups)} ad group(s), with their keywords and ads.`
-			: `Deleting ${target} in campaign "${result.impact.campaignName}" permanently deletes it and its ${countLabel(result.impact.targetingKeywords)} targeting keyword(s).`,
-	)
+			? `${target}, daily budget ${result.impact.dailyBudget} ${result.impact.currency}) removes it and its ${countLabel(result.impact.adGroups)} ad group(s).`
+			: `${target}) in campaign "${result.impact.campaignName}" removes it and its ${countLabel(result.impact.targetingKeywords)} targeting keyword(s).`
+	return deletePreviewSummary(`Deleting ${what} ${result.impact.cascades}`)
 }
 
 export function registerAppleAdsTools(

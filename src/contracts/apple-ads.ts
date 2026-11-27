@@ -213,6 +213,17 @@ export const ManageAppleAdsCampaignRequestSchema = z.discriminatedUnion(
 			dailyBudget: AccountMoney,
 			countriesOrRegions: z.array(z.string().length(2)).min(1),
 			adamId: EntityId,
+			supplyPlacement: z
+				.enum([
+					'APPSTORE_SEARCH_RESULTS',
+					'APPSTORE_SEARCH_TAB',
+					'APPSTORE_TODAY_TAB',
+					'APPSTORE_PRODUCT_PAGES',
+				])
+				.optional()
+				.describe(
+					'Where on the App Store the ads run: one placement per campaign. Default: APPSTORE_SEARCH_RESULTS.',
+				),
 			startTime: CampaignStartTime.optional(),
 			endTime: CampaignEndTime.optional(),
 		}),
@@ -318,6 +329,8 @@ export const ManageAppleAdsAdGroupRequestSchema = z.discriminatedUnion(
 			cpaGoal: AccountMoney.nullable().optional(),
 			searchMatch: z.boolean().optional(),
 			status: z.enum(['ENABLED', 'PAUSED']).optional(),
+			startTime: AdGroupStartTime.optional(),
+			endTime: AdGroupEndTime.optional(),
 		}),
 		AppleAdsSelectorSchema.extend({
 			action: z.literal('pause'),
@@ -463,6 +476,12 @@ export const GetAppleAdsNegativeKeywordsRequestSchema =
 		adGroupId: EntityId.optional().describe(
 			'AdGroup ID to list adgroup-level negative keywords.',
 		),
+		level: z
+			.enum(['campaign', 'adgroup'])
+			.optional()
+			.describe(
+				'With campaignId alone: "campaign" (the default) lists the campaign-level negatives, "adgroup" every ad group-level negative in that campaign.',
+			),
 		limit: z.number().int().min(1).max(1000).default(50),
 		offset: z.number().int().min(0).default(0),
 	})
@@ -530,18 +549,18 @@ export type ManageAppleAdsNegativeKeywordResponse = z.infer<
 
 // ── Deletes: preview, then apply in a later turn ────────────────────────────
 
-// No entity id and no connectionName: the token carries the connection and the campaign or ad group
-// it was signed for, as delete_project's apply carries no projectId. Re-selecting the connection on
-// apply would let a different name aim an approved token at other credentials.
-const AppleAdsDeleteApplySchema = z
-	.object({
-		organizationId: AppleAdsSelectorSchema.shape.organizationId,
-		action: z.literal('apply'),
-		idempotencyKey: IdempotencyKey,
-		previewToken: PreviewToken,
-		confirmName: deleteConfirmName('campaign or ad group'),
-	})
-	.strict()
+// No entity id: the token carries the campaign or ad group it was signed for, as delete_project's
+// apply carries no projectId. The API resolves the connection again and refuses (403) one the token
+// was not signed for, so the preview's connectionName has to come back.
+const AppleAdsDeleteApplySchema = AppleAdsSelectorSchema.extend({
+	connectionName: AppleAdsSelectorSchema.shape.connectionName.describe(
+		'The same connectionName the preview was called with; leave it out only if the preview did.',
+	),
+	action: z.literal('apply'),
+	idempotencyKey: IdempotencyKey,
+	previewToken: PreviewToken,
+	confirmName: deleteConfirmName('campaign or ad group'),
+}).strict()
 
 export const DeleteAppleAdsCampaignRequestSchema = z.discriminatedUnion(
 	'action',

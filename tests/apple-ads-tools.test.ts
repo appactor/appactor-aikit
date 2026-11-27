@@ -331,6 +331,65 @@ describe('Apple Ads MCP tools', () => {
 		})
 	})
 
+	for (const [tool, args, expected] of [
+		[
+			'manage_apple_ads_campaigns',
+			{
+				action: 'create',
+				name: 'Today Tab',
+				dailyBudget: 20,
+				countriesOrRegions: ['US'],
+				adamId: 1,
+				supplyPlacement: 'APPSTORE_TODAY_TAB',
+			},
+			{ supplyPlacement: 'APPSTORE_TODAY_TAB' },
+		],
+		[
+			'manage_apple_ads_adgroups',
+			{
+				action: 'update',
+				adGroupId: 201,
+				startTime: '2026-12-01T00:00:00.000Z',
+				endTime: '2026-12-31T00:00:00.000Z',
+			},
+			{
+				startTime: '2026-12-01T00:00:00.000Z',
+				endTime: '2026-12-31T00:00:00.000Z',
+			},
+		],
+	] as const) {
+		test(`${tool} ${args.action} sends ${Object.keys(expected).join(' and ')}`, async () => {
+			// G-3: fields the API now passes on to Apple.
+			const bodies: Array<Record<string, unknown>> = []
+			const fixture = await createMcpAppFixture(async (request) => {
+				bodies.push((await request.json()) as Record<string, unknown>)
+				return Response.json({
+					data: { action: args.action, status: 'PAUSED' },
+					requestId: 'req-g3-transport',
+				})
+			})
+			const token = await issueAccessToken(fixture, 'workspace:write')
+			const response = await mcpRpc(
+				fixture,
+				token,
+				'tools/call',
+				{
+					name: tool,
+					arguments: {
+						organizationId: ORGANIZATION_ID,
+						idempotencyKey: 'idem-g3-transport',
+						...args,
+					},
+					_meta: modernMeta(),
+				},
+				tool,
+			)
+			expect(response.status).toBe(200)
+			expect(bodies).toHaveLength(1)
+			expect(bodies[0]).toMatchObject(expected)
+		})
+	}
+
 	for (const [tool, idField] of [
 		['manage_apple_ads_campaigns', 'campaignId'],
 		['manage_apple_ads_adgroups', 'adGroupId'],
@@ -756,6 +815,36 @@ describe('Apple Ads MCP tools', () => {
 			offset: '0',
 			organizationId: ORGANIZATION_ID,
 		})
+	})
+
+	test('get_apple_ads_negative_keywords sends level for the ad group negatives of a campaign', async () => {
+		// The API's level=adgroup is the one query that lists every ad group-level negative in a
+		// campaign; campaignId alone now means campaign-level only (O-4).
+		let query: Record<string, string> | undefined
+		const fixture = await createMcpAppFixture(async (request) => {
+			query = Object.fromEntries(new URL(request.url).searchParams)
+			return Response.json({
+				data: { negativeKeywords: [] },
+				requestId: 'req-negs-level',
+			})
+		})
+		const token = await issueAccessToken(fixture, 'workspace:read')
+		await mcpRpc(
+			fixture,
+			token,
+			'tools/call',
+			{
+				name: 'get_apple_ads_negative_keywords',
+				arguments: {
+					campaignId: 101,
+					level: 'adgroup',
+					organizationId: ORGANIZATION_ID,
+				},
+				_meta: modernMeta(),
+			},
+			'get_apple_ads_negative_keywords',
+		)
+		expect(query).toMatchObject({ campaignId: '101', level: 'adgroup' })
 	})
 
 	test('manage_apple_ads_campaigns rejects read-only scope with 403', async () => {

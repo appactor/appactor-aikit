@@ -19,12 +19,12 @@ export function countLabel(value: { count: number; atLeast: boolean }) {
 }
 
 /**
- * The preview half: the sentence the user is asked to approve, then the stop. Deliberately spelled
- * out by each caller rather than summarised here: the confirmation the user has to type is the name,
- * not a yes, so the sentence must say exactly what goes.
+ * The preview half: what the user is asked to approve, then the stop. Deliberately spelled out by each
+ * caller rather than summarised here, including that it cannot be undone: the confirmation the user
+ * has to type is the name, not a yes, so the text must say exactly what goes.
  */
-export function deletePreviewSummary(destruction: string) {
-	return `${destruction} This cannot be undone.\n\n${DELETE_STOP_REMINDER}`
+export function deletePreviewSummary(approval: string) {
+	return `${approval}\n\n${DELETE_STOP_REMINDER}`
 }
 
 /** The apply half. `label` names the target as the user knows it: "project", "Apple Ads campaign". */

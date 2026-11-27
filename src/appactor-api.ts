@@ -671,6 +671,7 @@ export class AppActorApiClient {
 		const query = appleAdsSelectorQuery(request)
 		if (request.campaignId) query.set('campaignId', String(request.campaignId))
 		if (request.adGroupId) query.set('adGroupId', String(request.adGroupId))
+		if (request.level) query.set('level', request.level)
 		if (request.limit !== undefined) query.set('limit', String(request.limit))
 		if (request.offset !== undefined)
 			query.set('offset', String(request.offset))

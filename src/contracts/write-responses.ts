@@ -413,7 +413,11 @@ const AppleAdsEntityId = z.number().int().positive()
 const AppleAdsCampaignDeleteImpactSchema = z
 	.object({
 		status: z.string(),
+		dailyBudget: z.number(),
+		currency: z.string(),
 		adGroups: BoundedCountSchema,
+		// Apple's own cascade sentence, from the API: the summary quotes it rather than restating it.
+		cascades: z.string(),
 	})
 	.strict()
 
@@ -423,8 +427,14 @@ const AppleAdsAdGroupDeleteImpactSchema = z
 		campaignId: AppleAdsEntityId,
 		campaignName: z.string(),
 		targetingKeywords: BoundedCountSchema,
+		cascades: z.string(),
 	})
 	.strict()
+
+// The before-state of what was deleted (audit D-8). Absent when nothing was deleted (alreadyAbsent).
+const appleAdsDeleteExtra = {
+	previous: z.record(z.string(), z.unknown()).optional(),
+}
 
 export const DeleteAppleAdsCampaignResponseSchema = z.union([
 	deletePreview(
@@ -432,12 +442,18 @@ export const DeleteAppleAdsCampaignResponseSchema = z.union([
 		AppleAdsEntityId,
 		AppleAdsCampaignDeleteImpactSchema,
 	),
-	successfulOperation('apply', deleteOutcome('campaign', AppleAdsEntityId)),
+	successfulOperation(
+		'apply',
+		deleteOutcome('campaign', AppleAdsEntityId, appleAdsDeleteExtra),
+	),
 ])
 
 export const DeleteAppleAdsAdGroupResponseSchema = z.union([
 	deletePreview('adgroup', AppleAdsEntityId, AppleAdsAdGroupDeleteImpactSchema),
-	successfulOperation('apply', deleteOutcome('adgroup', AppleAdsEntityId)),
+	successfulOperation(
+		'apply',
+		deleteOutcome('adgroup', AppleAdsEntityId, appleAdsDeleteExtra),
+	),
 ])
 
 /**

@@ -7,8 +7,9 @@
   `delete_apple_ads_adgroup`, work like `delete_project`: `preview` reads the
   target with GETs only and returns its name, status, impact and a five-minute
   `previewToken`; `apply`, in a later turn, takes that token, an
-  `idempotencyKey` and `confirmName`, and no entity id or `connectionName`:
-  the token carries both. The `delete` action is gone from
+  `idempotencyKey`, `confirmName` and the preview's `connectionName`, but no
+  entity id: the token names the target. A successful apply returns the
+  deleted object's before-state under `previous`. The `delete` action is gone from
   `manage_apple_ads_campaigns` and `manage_apple_ads_adgroups`. Before this, a
   connection holding `workspace:write` could delete a live campaign tree in one
   call, and Apple restores none of it.
@@ -27,8 +28,13 @@
 - Ad group `create` `endTime` no longer accepts `null` either (Apple: leave it
   out to inherit the campaign's end date), and `cpaGoal` is described as an
   amount in the account's currency like the other money fields.
-- **Campaign `create` no longer takes `supplySources`.** The API never passed
-  it on, so every campaign landed on Search Results whatever was sent.
+- **Campaign `create` takes `supplyPlacement`** (one App Store placement,
+  default Search results) in place of `supplySources`, which the API never
+  passed on: every campaign landed on Search results whatever was sent.
+- **Ad group `update` carries `startTime` and `endTime`.**
+- **`get_apple_ads_negative_keywords` takes `level`.** With `campaignId` alone
+  the API now lists the campaign-level negatives; `level: "adgroup"` lists
+  every ad group-level negative in that campaign.
 - `manage_apple_ads_adgroups` now says that `pause` and `resume` change only the
   status, and that an ad group bid cannot be changed under automated bidding
   (`MAX_CONVERSIONS`). `appactor:asa` and `appactor:workspace` describe the new

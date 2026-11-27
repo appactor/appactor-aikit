@@ -129,7 +129,7 @@ function deleteSummary(result: DeleteProjectResponse | DeleteAppResponse) {
 	// to approve, and the confirmation they have to type is the name, not a yes.
 	const apps = target === 'project' ? namedApps(impact) : ''
 	return deletePreviewSummary(
-		`Deleting the ${target} "${result.name}" permanently destroys ${impactClauses(impact, target).join(', ')}.${apps}${analytics}`,
+		`Deleting the ${target} "${result.name}" permanently destroys ${impactClauses(impact, target).join(', ')}.${apps}${analytics} This cannot be undone.`,
 	)
 }
 

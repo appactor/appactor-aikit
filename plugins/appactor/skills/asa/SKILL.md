@@ -19,7 +19,7 @@ connection (`update_app { asaConnectionName }`) live in `appactor:workspace`.
 | `get_apple_ads_campaigns` | `workspace:read` | list (filter `status`), or one campaign by `campaignId` under `campaign` |
 | `get_apple_ads_adgroups` | `workspace:read` | list for a `campaignId`, or one by `adGroupId` |
 | `get_apple_ads_keywords` | `workspace:read` | targeting keywords of one `adGroupId` — required, Apple has no account-wide list |
-| `get_apple_ads_negative_keywords` | `workspace:read` | negatives at campaign (`campaignId`) or ad group (`adGroupId`) level |
+| `get_apple_ads_negative_keywords` | `workspace:read` | `campaignId` alone: the campaign-level negatives (`level: "adgroup"`: every ad group-level one in it); `adGroupId`: that ad group's |
 | `get_apple_ads_reports` | `analytics:read` | performance rows per campaign, ad group, keyword or search term |
 | `manage_apple_ads_campaigns` | `workspace:write` | `create`, `update`, `pause`, `resume` |
 | `delete_apple_ads_campaign` | `workspace:delete` | `preview`, then `apply` in a later turn |
@@ -126,10 +126,11 @@ like other workspace mutations:
 
 `update` is a partial update, as `update_app` in `appactor:workspace`: a field
 you omit is never written. It also accepts `status: "ENABLED" | "PAUSED"`,
-which is what `pause` and `resume` do. A campaign `update` can also move
-`startTime` and `endTime` (UTC, `2026-12-31T00:00:00.000`); a field left out
-keeps its current value. A campaign created without `endTime` runs with no end
-date.
+which is what `pause` and `resume` do. Campaign and ad group `update` can also
+move `startTime` and `endTime`; a field left out keeps its current value. A
+campaign created without `endTime` runs with no end date, an ad group without
+one inherits the campaign's. A campaign `create` runs on Search results unless
+`supplyPlacement` names another App Store placement.
 
 **Money is in the account's own currency.** Budgets and bids are plain numbers;
 AppActor reads the ad account's currency from Apple and sends every amount in
@@ -158,8 +159,9 @@ form of almost every "turn it off" request; offer it first.
 2. `action: "apply"` in a **later** turn, with the token, a new
    `idempotencyKey`, and `confirmName` set to the name the user typed in a
    message of their own — not the one from their request or the preview. No
-   entity id and no `connectionName`: the token names the target and the
-   connection. With no person there to type it, do not call apply at all.
+   entity id: the token names the target. Send the same `connectionName` the
+   preview used (none if it used none); a token signed for another connection
+   is refused. With no person there to type it, do not call apply at all.
 
 They need the `workspace:delete` scope. A connection approved without it gets a
 403 `insufficient_scope` on the first call; the user has to reconnect it to
