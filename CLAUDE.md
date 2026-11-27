@@ -25,7 +25,7 @@ Two things ship from here, and they have nothing to do with each other at
 runtime:
 
 1. **A remote MCP server** (`src/`) deployed at `https://mcp.appactor.com/mcp`.
-   31 tools over 12 scopes.
+   33 tools over 12 scopes.
 2. **A Claude Code / Codex plugin** (`plugins/appactor/`) — skills plus an
    `.mcp.json` pointing at that hosted server. Users install the plugin; they do
    not run this code.

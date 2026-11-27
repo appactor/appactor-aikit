@@ -1,5 +1,37 @@
 # Changelog
 
+## 0.7.0
+
+- **Apple Ads campaign and ad group deletes need `workspace:delete`, a preview
+  and a typed-back name.** Two new tools, `delete_apple_ads_campaign` and
+  `delete_apple_ads_adgroup`, work like `delete_project`: `preview` reads the
+  target with GETs only and returns its name, status, impact and a five-minute
+  `previewToken`; `apply`, in a later turn, takes that token, an
+  `idempotencyKey` and `confirmName`. The `delete` action is gone from
+  `manage_apple_ads_campaigns` and `manage_apple_ads_adgroups`. Before this, a
+  connection holding `workspace:write` could delete a live campaign tree in one
+  call, and Apple restores none of it.
+- **An ad group-level negative keyword is sent with `adGroupId` alone.**
+  Apple's NegativeKeywordCreate does not allow `campaignId` on it, and the tool
+  used to tell the model to send both. `manage_apple_ads_negative_keywords`
+  `create` now takes exactly one of `campaignId` or `adGroupId` and refuses
+  both or neither before the API.
+- **No currency input on Apple Ads writes.** The API sends every amount in the
+  ad account's own currency (read from Apple). The `currency` fields and their
+  `USD` defaults are removed from campaign, ad group and keyword creates and
+  from `update_bid`; a campaign read no longer invents `USD` either.
+- **Campaign `update` carries `startTime` and `endTime`** (`endTime: null`
+  removes the end date) instead of having no way to move them.
+- `manage_apple_ads_adgroups` now says that `pause` and `resume` change only the
+  status, and that an ad group bid cannot be changed under automated bidding
+  (`MAX_CONVERSIONS`). `appactor:asa` and `appactor:workspace` describe the new
+  delete flow, single-id negatives, the account currency, and the member-level
+  "all projects" requirement for Apple Ads.
+- Requires the `appactor-final-api` Apple Ads round of 27 November 2026
+  (`fix/asa-yazma`). **Deploy the API first:** an older API has no
+  `/apple-ads/campaigns/delete` or `/apple-ads/adgroups/delete` route, refuses
+  an ad group negative without `campaignId`, and drops campaign update dates.
+
 ## 0.6.2
 
 - **Apple Ads writes are backed by the API idempotency ledger.** The four

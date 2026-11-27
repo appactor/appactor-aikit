@@ -1024,7 +1024,7 @@ describe('Apple Ads MCP tools', () => {
 				'utf8',
 			),
 		) as { version: string }
-		expect(pkg.version).toBe('0.6.2')
+		expect(pkg.version).toBe('0.7.0')
 		expect(plugin.version).toBe(pkg.version)
 	})
 })
