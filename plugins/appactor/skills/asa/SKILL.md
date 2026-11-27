@@ -127,7 +127,9 @@ like other workspace mutations:
 `update` is a partial update, as `update_app` in `appactor:workspace`: a field
 you omit is never written. It also accepts `status: "ENABLED" | "PAUSED"`,
 which is what `pause` and `resume` do. A campaign `update` can also move
-`startTime` and `endTime` (UTC); `endTime: null` removes the end date.
+`startTime` and `endTime` (UTC, `2026-12-31T00:00:00.000`); a field left out
+keeps its current value. A campaign created without `endTime` runs with no end
+date.
 
 **Money is in the account's own currency.** Budgets and bids are plain numbers;
 AppActor reads the ad account's currency from Apple and sends every amount in

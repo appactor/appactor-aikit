@@ -20,8 +20,11 @@
   ad account's own currency (read from Apple). The `currency` fields and their
   `USD` defaults are removed from campaign, ad group and keyword creates and
   from `update_bid`; a campaign read no longer invents `USD` either.
-- **Campaign `update` carries `startTime` and `endTime`** (`endTime: null`
-  removes the end date) instead of having no way to move them.
+- **Campaign `update` carries `startTime` and `endTime`** instead of having no
+  way to move them. Neither accepts `null` any more: Apple documents an absent
+  `endTime` as "no end date" and documents no null.
+- **Campaign `create` no longer takes `supplySources`.** The API never passed
+  it on, so every campaign landed on Search Results whatever was sent.
 - `manage_apple_ads_adgroups` now says that `pause` and `resume` change only the
   status, and that an ad group bid cannot be changed under automated bidding
   (`MAX_CONVERSIONS`). `appactor:asa` and `appactor:workspace` describe the new

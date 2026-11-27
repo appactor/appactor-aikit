@@ -295,7 +295,7 @@ describe('Apple Ads MCP tools', () => {
 		).not.toHaveProperty('currency')
 	})
 
-	test('campaign update forwards startTime and endTime, null included', async () => {
+	test('campaign update forwards startTime and endTime', async () => {
 		const bodies: Array<Record<string, unknown>> = []
 		const fixture = await createMcpAppFixture(async (request) => {
 			bodies.push((await request.json()) as Record<string, unknown>)
@@ -317,7 +317,7 @@ describe('Apple Ads MCP tools', () => {
 					idempotencyKey: 'idem-camp-dates',
 					campaignId: 101,
 					startTime: '2026-12-01T00:00:00.000',
-					endTime: null,
+					endTime: '2026-12-31T00:00:00.000',
 				},
 				_meta: modernMeta(),
 			},
@@ -325,11 +325,11 @@ describe('Apple Ads MCP tools', () => {
 		)
 		expect(response.status).toBe(200)
 		expect(bodies).toHaveLength(1)
-		// An explicit null clears the end date; it must survive as null, not collapse into "omitted".
+		// G-3: these used to have no way through at all on an update.
 		expect(bodies[0]).toMatchObject({
 			action: 'update',
 			startTime: '2026-12-01T00:00:00.000',
-			endTime: null,
+			endTime: '2026-12-31T00:00:00.000',
 		})
 	})
 

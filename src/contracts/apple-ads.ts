@@ -19,24 +19,21 @@ const AccountMoney = z
 		"Amount in the Apple Ads account's own currency; AppActor reads that currency from Apple, so there is no currency field.",
 	)
 
-// Its own base, not AccountMoney with a second .describe(): a wrapper's description is published
-// alongside the inner one, not instead of it.
-const AdGroupBidUpdate = z
-	.number()
-	.positive()
-	.describe(
-		"New default max cost-per-tap bid, in the Apple Ads account's own currency. Refused when the campaign uses automated bidding (MAX_CONVERSIONS): its ad groups take their bids from the campaign's strategy.",
-	)
-
+// Apple's CampaignUpdate documents both as `yyyy-MM-dd'T'HH:mm:ss.SSS` in UTC, and an absent endTime as
+// "running indefinitely". It documents no null, so none is accepted: on an update, absent means
+// unchanged.
 const CampaignStartTime = z
 	.string()
 	.describe('Start date and time in UTC, e.g. 2026-12-01T00:00:00.000.')
 const CampaignEndTime = z
 	.string()
-	.nullable()
 	.describe(
-		'End date and time in UTC, e.g. 2026-12-31T23:59:59.000; null means no end date.',
+		'End date and time in UTC, e.g. 2026-12-31T00:00:00.000. Leave it out for no end date, or on update to keep the current one.',
 	)
+
+/** Stated once: the tool description composes it, and the refinement below enforces it. */
+export const NEGATIVE_KEYWORD_SCOPE_RULE =
+	'A campaign-level negative takes campaignId alone; an ad group-level negative takes adGroupId alone, because Apple does not allow campaignId on it.'
 
 // ── Base & Credential Selection ─────────────────────────────────────────────
 
@@ -213,7 +210,6 @@ export const ManageAppleAdsCampaignRequestSchema = z.discriminatedUnion(
 			dailyBudget: AccountMoney,
 			countriesOrRegions: z.array(z.string().length(2)).min(1),
 			adamId: EntityId,
-			supplySources: z.array(z.string()).optional(),
 			startTime: CampaignStartTime.optional(),
 			endTime: CampaignEndTime.optional(),
 		}),
@@ -315,7 +311,7 @@ export const ManageAppleAdsAdGroupRequestSchema = z.discriminatedUnion(
 			idempotencyKey: IdempotencyKey,
 			adGroupId: EntityId,
 			name: z.string().min(1).max(255).optional(),
-			defaultBid: AdGroupBidUpdate.optional(),
+			defaultBid: AccountMoney.optional(),
 			cpaGoal: z.number().positive().nullable().optional(),
 			searchMatch: z.boolean().optional(),
 			status: z.enum(['ENABLED', 'PAUSED']).optional(),
@@ -487,10 +483,10 @@ export const ManageAppleAdsNegativeKeywordRequestSchema = z.discriminatedUnion(
 			text: z.string().min(1),
 			matchType: MatchTypeEnum.default('EXACT'),
 			campaignId: EntityId.optional().describe(
-				'For a campaign-level negative keyword: the campaign ID, sent without adGroupId.',
+				'Campaign ID, for a campaign-level negative keyword.',
 			),
 			adGroupId: EntityId.optional().describe(
-				'For an ad group-level negative keyword: the ad group ID, sent without campaignId. Apple does not allow campaignId on an ad group-level negative.',
+				'Ad group ID, for an ad group-level negative keyword.',
 			),
 		}).refine(
 			// Apple's NegativeKeywordCreate: campaignId "must not be set" on an ad group-level negative.
@@ -542,6 +538,17 @@ const AppleAdsDeleteConfirmName = z
 // No entity id: the token carries the campaign or ad group it was signed for, as delete_project's
 // apply carries no projectId.
 const AppleAdsDeleteApplySchema = AppleAdsSelectorSchema.extend({
+	// Its own schema rather than the selector's: that one says when to leave it out, and here the
+	// answer is "only if the preview left it out too".
+	connectionName: z
+		.string()
+		.trim()
+		.min(1)
+		.max(255)
+		.optional()
+		.describe(
+			'The same connectionName the preview was called with; leave it out only if the preview did.',
+		),
 	action: z.literal('apply'),
 	idempotencyKey: IdempotencyKey,
 	previewToken: PreviewToken,
