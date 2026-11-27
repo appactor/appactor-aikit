@@ -171,6 +171,70 @@ export function deleteOutcome(
 	)
 }
 
+export const appleAdsAdGroupDeleteImpact = {
+	status: 'PAUSED',
+	campaignId: 101,
+	campaignName: 'Brand US',
+	targetingKeywords: { count: 1000, atLeast: true },
+	cascades:
+		'Apple deletes the ad group together with its keywords and ads. It cannot be undone.',
+}
+
+/**
+ * Apple Ads deletes report Apple's numeric ids and their own impact shapes: a campaign counts its ad
+ * groups, an ad group names its campaign and counts its targeting keywords.
+ */
+const appleAdsDeleteTargets = {
+	campaign: {
+		targetId: 101,
+		impact: {
+			status: 'ENABLED',
+			dailyBudget: 50,
+			currency: 'EUR',
+			adGroups: { count: 3, atLeast: false },
+			cascades:
+				'Apple deletes the campaign together with its ad groups, keywords and ads. It cannot be undone.',
+		},
+	},
+	adgroup: { targetId: 201, impact: appleAdsAdGroupDeleteImpact },
+} as const
+
+export function appleAdsDeletePreview(
+	target: 'campaign' | 'adgroup',
+	name: string,
+) {
+	return {
+		status: 'preview' as const,
+		target,
+		name,
+		...appleAdsDeleteTargets[target],
+		previewToken: 'p'.repeat(48),
+		expiresAt: timestamp,
+	}
+}
+
+export function appleAdsDeleteOutcome(
+	target: 'campaign' | 'adgroup',
+	name: string,
+	overrides: { alreadyAbsent?: boolean; replayed?: boolean } = {},
+) {
+	return succeeded(
+		'apply',
+		{
+			deleted: true as const,
+			alreadyAbsent: overrides.alreadyAbsent ?? false,
+			target,
+			targetId: appleAdsDeleteTargets[target].targetId,
+			name,
+			// The API sends the before-state only when something was actually deleted.
+			...(overrides.alreadyAbsent
+				? {}
+				: { previous: { id: appleAdsDeleteTargets[target].targetId, name } }),
+		},
+		overrides.replayed ?? false,
+	)
+}
+
 export const appleWebhookVerified = {
 	state: 'verified' as const,
 	source: 'test_notification' as const,

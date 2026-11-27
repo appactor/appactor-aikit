@@ -9,6 +9,7 @@ import {
 	stopTestServers,
 } from './helpers/mcp-app-fixture'
 import {
+	appleAdsDeletePreview,
 	deletePreview,
 	entitlement,
 	ids,
@@ -118,6 +119,19 @@ const toolCases = [
 		arguments: { action: 'preview', organizationId, appId: resourceId },
 	},
 	{
+		name: 'delete_apple_ads_campaign',
+		scope: 'workspace:delete',
+		path: '/v1/internal/mcp/apple-ads/campaigns/delete',
+		// Selector first: the body is signed in the schema's key order.
+		arguments: { organizationId, action: 'preview', campaignId: 101 },
+	},
+	{
+		name: 'delete_apple_ads_adgroup',
+		scope: 'workspace:delete',
+		path: '/v1/internal/mcp/apple-ads/adgroups/delete',
+		arguments: { organizationId, action: 'preview', adGroupId: 201 },
+	},
+	{
 		name: 'manage_refund_saver',
 		scope: 'refunds:write',
 		path: '/v1/internal/mcp/refund-saver',
@@ -184,8 +198,10 @@ describe('MCP controlled write tools', () => {
 			'get_apple_ads_reports',
 			'get_apple_ads_campaigns',
 			'manage_apple_ads_campaigns',
+			'delete_apple_ads_campaign',
 			'get_apple_ads_adgroups',
 			'manage_apple_ads_adgroups',
+			'delete_apple_ads_adgroup',
 			'get_apple_ads_keywords',
 			'manage_apple_ads_keywords',
 			'get_apple_ads_negative_keywords',
@@ -219,6 +235,14 @@ describe('MCP controlled write tools', () => {
 				openWorldHint: true,
 			},
 			manage_apple_ads_negative_keywords: {
+				destructiveHint: true,
+				openWorldHint: true,
+			},
+			delete_apple_ads_campaign: {
+				destructiveHint: true,
+				openWorldHint: true,
+			},
+			delete_apple_ads_adgroup: {
 				destructiveHint: true,
 				openWorldHint: true,
 			},
@@ -301,6 +325,18 @@ describe('MCP controlled write tools', () => {
 				return Response.json({
 					data: deletePreview('app', 'Example App'),
 					requestId: 'request-5',
+				})
+			}
+			if (verified.payload.tool === 'delete_apple_ads_campaign') {
+				return Response.json({
+					data: appleAdsDeletePreview('campaign', 'Brand US'),
+					requestId: 'request-8',
+				})
+			}
+			if (verified.payload.tool === 'delete_apple_ads_adgroup') {
+				return Response.json({
+					data: appleAdsDeletePreview('adgroup', 'Exact Match'),
+					requestId: 'request-9',
 				})
 			}
 			const data =

@@ -1,5 +1,57 @@
 # Changelog
 
+## 0.7.0
+
+- **Apple Ads campaign and ad group deletes need `workspace:delete`, a preview
+  and a typed-back name.** Two new tools, `delete_apple_ads_campaign` and
+  `delete_apple_ads_adgroup`, work like `delete_project`: `preview` reads the
+  target with GETs only and returns its name, status, impact and a five-minute
+  `previewToken`; `apply`, in a later turn, takes that token, an
+  `idempotencyKey`, `confirmName` and the preview's `connectionName`, but no
+  entity id: the token names the target. A successful apply returns the
+  deleted object's before-state under `previous`. The `delete` action is gone from
+  `manage_apple_ads_campaigns` and `manage_apple_ads_adgroups`. Before this, a
+  connection holding `workspace:write` could delete a live campaign tree in one
+  call, and Apple restores none of it.
+- **An ad group-level negative keyword is sent with `adGroupId` alone.**
+  Apple's NegativeKeywordCreate does not allow `campaignId` on it, and the tool
+  used to tell the model to send both. `manage_apple_ads_negative_keywords`
+  `create` now takes exactly one of `campaignId` or `adGroupId` and refuses
+  both or neither before the API.
+- **No currency input on Apple Ads writes.** The API sends every amount in the
+  ad account's own currency (read from Apple). The `currency` fields and their
+  `USD` defaults are removed from campaign, ad group and keyword creates and
+  from `update_bid`; a campaign read no longer invents `USD` either.
+- **Campaign `update` carries `startTime` and `endTime`** instead of having no
+  way to move them. Neither accepts `null` any more: Apple documents an absent
+  `endTime` as "no end date" and documents no null.
+- Ad group `create` `endTime` no longer accepts `null` either (Apple: leave it
+  out to inherit the campaign's end date), and `cpaGoal` is described as an
+  amount in the account's currency like the other money fields.
+- **Campaign `create` takes `supplyPlacement`** (one App Store placement,
+  default Search results) in place of `supplySources`, which the API never
+  passed on: every campaign landed on Search results whatever was sent.
+- **Ad group `update` carries `startTime` and `endTime`.**
+- **`get_apple_ads_negative_keywords` takes `level`.** With `campaignId` alone
+  the API now lists the campaign-level negatives; `level: "adgroup"` lists
+  every ad group-level negative in that campaign.
+- **Ad group `create` no longer requires `defaultBid`.** With manual bidding it
+  is still needed; in an automated-bidding (`MAX_CONVERSIONS`) campaign it is
+  left out, where Apple refuses a bid of its own — before, MCP could not create
+  an ad group there at all.
+- **`manage_apple_ads_keywords` no longer advertises a 50-keyword batch.** The
+  tool takes one keyword per `create`, and now says so.
+- `manage_apple_ads_adgroups` now says that `pause` and `resume` change only the
+  status, and when `defaultBid` is sent or left out (manual versus
+  `MAX_CONVERSIONS` bidding). `appactor:asa` and `appactor:workspace` describe the new
+  delete flow, single-id negatives, the account currency, and the member-level
+  "all projects" requirement for Apple Ads.
+- Requires the `appactor-final-api` Apple Ads round of 27 November 2026
+  (`fix/asa-yazma`). **Deploy the API first:** an older API has no
+  `/apple-ads/campaigns/delete` or `/apple-ads/adgroups/delete` route, refuses
+  an ad group negative without `campaignId`, drops campaign update dates, and
+  requires `defaultBid` on every ad group create.
+
 ## 0.6.2
 
 - **Apple Ads writes are backed by the API idempotency ledger.** The four

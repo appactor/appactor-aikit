@@ -26,21 +26,12 @@ import {
 	successResult,
 	writeToolAnnotations,
 } from '../tool-runtime'
-
-/**
- * The one rule this feature exists to enforce, written once.
- *
- * It has to reach the model in three places — both tool descriptions, the server instructions, and
- * the reminder attached to every preview result — and when those were three hand-written strings
- * they had already drifted after a single round of edits, with the runtime one (the copy the model
- * reads at the exact moment it decides) ending up the weakest of the three.
- */
-export const DELETE_CONFIRMATION_RULE =
-	'Call action "apply" only in a LATER turn, with confirmName set to the name the user typed in a new message of their own. The name they used when asking for the deletion does not count, nor does any name already in this conversation, nor the one in the preview. If there is no interactive user — an unattended or automated run — do not call apply at all; say deletion needs a person and stop.'
-
-const DELETE_PROTOCOL = `Two steps. First call action "preview" for the blast radius and a previewToken that expires in five minutes. Show it and END YOUR TURN. ${DELETE_CONFIRMATION_RULE} This cannot be undone.`
-
-const DELETE_STOP_REMINDER = `STOP HERE. End your turn with this text and wait. ${DELETE_CONFIRMATION_RULE}`
+import {
+	DELETE_PROTOCOL,
+	countLabel,
+	deleteOutcomeSummary,
+	deletePreviewSummary,
+} from './delete-protocol'
 
 const DELETE_PROJECT_DESCRIPTION = `Permanently delete a project and everything inside it: every app, product, subscriber, purchase, remote config, experiment and customer token balance, plus the analytics history. ${DELETE_PROTOCOL}`
 
@@ -70,10 +61,6 @@ function createSummary(
 			? result.result.appleConnectionWarning
 			: undefined
 	return warning ? `${created} ${warning}` : created
-}
-
-function countLabel(value: { count: number; atLeast: boolean }) {
-	return value.atLeast ? `${value.count}+` : `${value.count}`
 }
 
 /**
@@ -128,12 +115,12 @@ function namedApps(impact: DeleteImpact) {
  * enough to invite exactly that copy-paste.
  */
 function deleteSummary(result: DeleteProjectResponse | DeleteAppResponse) {
-	if (result.status !== 'preview') {
-		const { target, name, alreadyAbsent } = result.result
-		if (alreadyAbsent)
-			return `The ${target} "${name}" was already deleted; nothing to do.`
-		return `${target} "${name}" deleted${result.replayed ? ' (replayed)' : ''}.`
-	}
+	if (result.status !== 'preview')
+		return deleteOutcomeSummary(
+			result.result.target,
+			result.result,
+			result.replayed,
+		)
 	const { target, impact } = result
 	const analytics = impact.analyticsPurged
 		? ' The analytics history is permanently purged too.'
@@ -141,7 +128,9 @@ function deleteSummary(result: DeleteProjectResponse | DeleteAppResponse) {
 	// Deliberately spelled out rather than summarised: this string is what the user is being asked
 	// to approve, and the confirmation they have to type is the name, not a yes.
 	const apps = target === 'project' ? namedApps(impact) : ''
-	return `Deleting the ${target} "${result.name}" permanently destroys ${impactClauses(impact, target).join(', ')}.${apps}${analytics} This cannot be undone.\n\n${DELETE_STOP_REMINDER}`
+	return deletePreviewSummary(
+		`Deleting the ${target} "${result.name}" permanently destroys ${impactClauses(impact, target).join(', ')}.${apps}${analytics} This cannot be undone.`,
+	)
 }
 
 const CREATE_APP_DESCRIPTION =

@@ -9,6 +9,9 @@ import {
 } from './helpers/mcp-app-fixture'
 import {
 	appDeleteImpact,
+	appleAdsAdGroupDeleteImpact,
+	appleAdsDeleteOutcome,
+	appleAdsDeletePreview,
 	deleteOutcome,
 	deletePreview,
 	ids,
@@ -24,37 +27,67 @@ const previewArguments = {
 	projectId: ids.project,
 } as const
 
+const campaignPreview = {
+	organizationId: ids.organization,
+	action: 'preview',
+	campaignId: 101,
+} as const
+
+const adGroupPreview = {
+	organizationId: ids.organization,
+	action: 'preview',
+	adGroupId: 201,
+} as const
+
+const appleAdsApply = {
+	organizationId: ids.organization,
+	action: 'apply',
+	idempotencyKey: 'delete-campaign-apply-1',
+	previewToken: 'p'.repeat(48),
+} as const
+
 describe('MCP delete tools', () => {
-	test('a write scope does not carry delete with it', async () => {
-		// The whole point of a separate scope: a connection approved before deletion existed must not
-		// gain it silently, and the refusal has to happen before the API is ever called.
-		let upstreamCalls = 0
-		const fixture = await createMcpAppFixture(async () => {
-			upstreamCalls += 1
-			throw new Error('Delete must not reach the API.')
-		})
-		const writeToken = await issueAccessToken(fixture, 'workspace:write')
-		const response = await mcpRpc(
-			fixture,
-			writeToken,
-			'tools/call',
+	for (const [tool, args] of [
+		['delete_project', previewArguments],
+		[
+			'delete_app',
 			{
-				name: 'delete_project',
-				arguments: previewArguments,
-				_meta: modernMeta(),
+				action: 'preview',
+				organizationId: ids.organization,
+				appId: ids.resource,
 			},
-			'delete_project',
-		)
-		expect(response.status).toBe(403)
-		// Naming the scope in the challenge is what sends the client back through consent. Asserting it
-		// also pins the TOOL_SCOPES mapping: drop delete_project from it and requiredScopeForRequest
-		// falls back to workspace:read, which this same token would still be refused for -- a green
-		// test over a broken mapping.
-		expect(response.headers.get('www-authenticate')).toContain(
-			'workspace:delete',
-		)
-		expect(upstreamCalls).toBe(0)
-	})
+		],
+		['delete_apple_ads_campaign', campaignPreview],
+		['delete_apple_ads_adgroup', adGroupPreview],
+	] as const) {
+		test(`a write scope does not carry ${tool} with it`, async () => {
+			// The whole point of a separate scope: a connection approved before deletion existed must not
+			// gain it silently, and the refusal has to happen before the API is ever called. The Apple Ads
+			// deletes used to sit under workspace:write, which every connection that created an app holds.
+			let upstreamCalls = 0
+			const fixture = await createMcpAppFixture(async () => {
+				upstreamCalls += 1
+				throw new Error('Delete must not reach the API.')
+			})
+			const writeToken = await issueAccessToken(fixture, 'workspace:write')
+			const response = await mcpRpc(
+				fixture,
+				writeToken,
+				'tools/call',
+				{ name: tool, arguments: args, _meta: modernMeta() },
+				tool,
+			)
+			expect(response.status).toBe(403)
+			// Naming the scope in the challenge is what sends the client back through consent. Asserting it
+			// also pins the TOOL_SCOPES mapping: drop a delete tool from it and requiredScopeForRequest
+			// falls back to workspace:read, which this same token would still be refused for -- a green
+			// test over a broken mapping.
+			expect(response.headers.get('www-authenticate')).toContain(
+				'workspace:delete',
+			)
+			expect(upstreamCalls).toBe(0)
+		})
+	}
 
 	test('every registered tool has a scope mapped to it', async () => {
 		// The fallback for an unmapped tool is workspace:read, which nearly every connection holds, so
@@ -253,5 +286,205 @@ describe('MCP delete tools', () => {
 		const body = await response.json()
 		expect(body.result?.isError).toBe(true)
 		expect(body.result?.content?.[0]?.text).toContain('same idempotencyKey')
+	})
+
+	describe('Apple Ads campaign and ad group deletes', () => {
+		test('the campaign preview names the target, its cascade and who must confirm', async () => {
+			const fixture = await createMcpAppFixture(async () =>
+				Response.json({
+					data: appleAdsDeletePreview('campaign', 'Brand US'),
+					requestId: 'request-asa-preview',
+				}),
+			)
+			const token = await issueAccessToken(fixture, 'workspace:delete')
+			const response = await mcpRpc(
+				fixture,
+				token,
+				'tools/call',
+				{
+					name: 'delete_apple_ads_campaign',
+					arguments: campaignPreview,
+					_meta: modernMeta(),
+				},
+				'delete_apple_ads_campaign',
+			)
+			const body = await response.json()
+			expect(response.status).toBe(200)
+			expect(body.result?.isError).not.toBe(true)
+			const text = body.result?.content?.[0]?.text as string
+			expect(text).toContain(
+				'campaign "Brand US" (ID 101, ENABLED, daily budget 50 EUR)',
+			)
+			expect(text).toContain('3 ad group(s)')
+			// Apple's cascade sentence comes from the API, not restated here.
+			expect(text).toContain('together with its ad groups, keywords and ads')
+			expect(text).toContain('cannot be undone')
+			expect(text).toContain('STOP HERE')
+			expect(text).toContain('LATER turn')
+			expect(body.result?.structuredContent?.previewToken).toBe('p'.repeat(48))
+			expect(body.result?.structuredContent).not.toHaveProperty('confirmName')
+		})
+
+		test('the ad group preview names its campaign and reads a bounded count as a floor', async () => {
+			const fixture = await createMcpAppFixture(async () =>
+				Response.json({
+					data: appleAdsDeletePreview('adgroup', 'Exact Match'),
+					requestId: 'request-asa-adgroup-preview',
+				}),
+			)
+			const token = await issueAccessToken(fixture, 'workspace:delete')
+			const response = await mcpRpc(
+				fixture,
+				token,
+				'tools/call',
+				{
+					name: 'delete_apple_ads_adgroup',
+					arguments: adGroupPreview,
+					_meta: modernMeta(),
+				},
+				'delete_apple_ads_adgroup',
+			)
+			const body = await response.json()
+			const text = body.result?.content?.[0]?.text as string
+			expect(text).toContain('ad group "Exact Match" (ID 201, PAUSED)')
+			expect(text).toContain('in campaign "Brand US"')
+			expect(text).toContain('1000+ targeting keyword(s)')
+			expect(text).toContain('STOP HERE')
+			expect(body.result?.structuredContent?.impact).toEqual(
+				appleAdsAdGroupDeleteImpact,
+			)
+		})
+
+		test('apply sends previewToken and confirmName untouched, and no entity id', async () => {
+			// Wrong on purpose, as in the project test: a tool that substituted the preview's name
+			// would still be caught.
+			const bodies: Array<Record<string, unknown>> = []
+			const fixture = await createMcpAppFixture(async (request) => {
+				bodies.push((await request.json()) as Record<string, unknown>)
+				return Response.json({
+					data: appleAdsDeleteOutcome('campaign', 'Brand US'),
+					requestId: 'request-asa-apply',
+				})
+			})
+			const token = await issueAccessToken(fixture, 'workspace:delete')
+			const response = await mcpRpc(
+				fixture,
+				token,
+				'tools/call',
+				{
+					name: 'delete_apple_ads_campaign',
+					arguments: {
+						...appleAdsApply,
+						confirmName: 'brand us (typed wrong)',
+					},
+					_meta: modernMeta(),
+				},
+				'delete_apple_ads_campaign',
+			)
+			const body = await response.json()
+			expect(body.result?.content?.[0]?.text).toBe(
+				'Apple Ads campaign "Brand US" deleted.',
+			)
+			expect(bodies).toHaveLength(1)
+			expect(bodies[0]).toEqual({
+				...appleAdsApply,
+				confirmName: 'brand us (typed wrong)',
+			})
+		})
+
+		test('an apply carrying a campaignId is refused: the token names the target', async () => {
+			let upstreamCalls = 0
+			const fixture = await createMcpAppFixture(async () => {
+				upstreamCalls += 1
+				throw new Error('Must not reach the API.')
+			})
+			const token = await issueAccessToken(fixture, 'workspace:delete')
+			const response = await mcpRpc(
+				fixture,
+				token,
+				'tools/call',
+				{
+					name: 'delete_apple_ads_campaign',
+					arguments: {
+						...appleAdsApply,
+						confirmName: 'Brand US',
+						campaignId: 999,
+					},
+					_meta: modernMeta(),
+				},
+				'delete_apple_ads_campaign',
+			)
+			const body = await response.json()
+			expect(body.result?.isError).toBe(true)
+			expect(upstreamCalls).toBe(0)
+		})
+
+		test("apply carries the preview's connectionName through", async () => {
+			// The API resolves the connection again and refuses one the token was not signed for, so with
+			// several connections the name has to be sendable on apply.
+			const bodies: Array<Record<string, unknown>> = []
+			const fixture = await createMcpAppFixture(async (request) => {
+				bodies.push((await request.json()) as Record<string, unknown>)
+				return Response.json({
+					data: appleAdsDeleteOutcome('adgroup', 'Exact Match'),
+					requestId: 'request-asa-apply-connection',
+				})
+			})
+			const token = await issueAccessToken(fixture, 'workspace:delete')
+			const args = {
+				...appleAdsApply,
+				connectionName: 'EU Ads',
+				confirmName: 'Exact Match',
+			}
+			const response = await mcpRpc(
+				fixture,
+				token,
+				'tools/call',
+				{
+					name: 'delete_apple_ads_adgroup',
+					arguments: args,
+					_meta: modernMeta(),
+				},
+				'delete_apple_ads_adgroup',
+			)
+			const body = await response.json()
+			expect(body.result?.isError).not.toBe(true)
+			expect(body.result?.content?.[0]?.text).toBe(
+				'Apple Ads ad group "Exact Match" deleted.',
+			)
+			expect(bodies[0]).toEqual(args)
+		})
+
+		test('reports an already-deleted ad group as done', async () => {
+			const fixture = await createMcpAppFixture(async () =>
+				Response.json({
+					data: appleAdsDeleteOutcome('adgroup', 'Exact Match', {
+						alreadyAbsent: true,
+					}),
+					requestId: 'request-asa-absent',
+				}),
+			)
+			const token = await issueAccessToken(fixture, 'workspace:delete')
+			const response = await mcpRpc(
+				fixture,
+				token,
+				'tools/call',
+				{
+					name: 'delete_apple_ads_adgroup',
+					arguments: {
+						...appleAdsApply,
+						idempotencyKey: 'delete-adgroup-retry-1',
+						confirmName: 'Exact Match',
+					},
+					_meta: modernMeta(),
+				},
+				'delete_apple_ads_adgroup',
+			)
+			const body = await response.json()
+			expect(body.result?.isError).not.toBe(true)
+			expect(body.result?.content?.[0]?.text).toBe(
+				'The Apple Ads ad group "Exact Match" was already deleted; nothing to do.',
+			)
+		})
 	})
 })

@@ -68,13 +68,15 @@ rather than reporting zero revenue as fact.
 Write tools: `manage_products`, `manage_entitlements`, `manage_offerings`,
 `manage_packages`, `create_project`, `create_app`, `update_app`,
 `delete_project`, `delete_app`, `manage_remote_config`, `manage_experiments`,
-`manage_refund_saver`, and the four `manage_apple_ads_*` tools (see
+`manage_refund_saver`, and the four `manage_apple_ads_*` tools plus
+`delete_apple_ads_campaign` and `delete_apple_ads_adgroup` (see
 `appactor:asa`).
 
 **Almost every mutation takes a client-generated `idempotencyKey`.** The
 exceptions are `manage_products` `discover`, `manage_offerings`
-`preview_publish`, and the `preview` action of `delete_project` and
-`delete_app` — they are reads in write clothing and take no key. Passing one
+`preview_publish`, and the `preview` action of the four delete tools
+(`delete_project`, `delete_app`, `delete_apple_ads_campaign`,
+`delete_apple_ads_adgroup`) — they are reads in write clothing and take no key. Passing one
 is a validation error, because those schemas reject unknown fields.
 
 For the rest, the rules matter:
@@ -98,9 +100,7 @@ The four `manage_apple_ads_*` tools also run through the `mcp_write_operations`
 ledger and appear in `get_audit_log`, with one extra recovery rule: create calls
 never blindly re-POST on a 5xx or network timeout — after an `uncertain`
 failure, retrying the **same** `idempotencyKey` and identical arguments safely
-reclaims the entry and searches Apple Ads before sending any second `POST`. If a
-multi-keyword `create` batch fails partway through, the entry stays `uncertain`
-with the already-created keyword IDs recorded in `get_audit_log`. If an
+reclaims the entry and searches Apple Ads before sending any second `POST`. If an
 immediate retry after MCP's 35-second timeout returns `409 Conflict` because the
 first API call is still in flight (`pending`), wait briefly and retry with the
 **same** key (retrying after 5 minutes of inactivity transitions an interrupted
@@ -212,8 +212,11 @@ attribution import for it. `get_app_setup` lists what exists under
 
 ## Deleting a project or an app
 
-`delete_project` and `delete_app` are the only deletes that exist, they are
-permanent, and they are two calls, never one.
+`delete_project` and `delete_app` are the only deletes of AppActor data, they
+are permanent, and they are two calls, never one. Deleting an Apple Ads campaign
+or ad group (`delete_apple_ads_campaign`, `delete_apple_ads_adgroup`, covered in
+`appactor:asa`) follows the same two calls, the same scope and the same
+confirmation rule.
 
 **They need the `workspace:delete` scope, which is newer than most
 connections.** A connection approved before it existed gets an HTTP 403 with an

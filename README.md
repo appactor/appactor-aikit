@@ -50,8 +50,8 @@ product catalog, one named subscriber, remote config and experiments, how an app
 answers Apple's refund requests, and a record of what AI clients changed.
 Writes: products, entitlements, offerings, packages, projects, apps, remote
 config, experiments, and refund handling — plus changing an app's name, bundle
-ID, store credential or Apple Ads connection, and deleting a project or an app
-behind a two-step confirmation.
+ID, store credential or Apple Ads connection, and deleting a project, an app, or
+an Apple Ads campaign or ad group behind a two-step confirmation.
 
 **Skills** that teach your agent the AppActor SDKs and product model:
 
@@ -99,7 +99,8 @@ Every mutation is recorded with the actor, the client, the tool, and the
 resources it touched, and is replay-safe: retrying an interrupted write with the
 same idempotency key returns the stored result instead of duplicating it.
 
-Deleting a project or an app is available, and only through a two-step preview:
+Deleting a project, an app, or an Apple Ads campaign or ad group is available,
+and only through a two-step preview:
 the first call reports exactly what would be destroyed, the second needs that
 preview's token plus the name typed back by you. It is a separate
 `workspace:delete` scope, so a connection approved before it existed does not

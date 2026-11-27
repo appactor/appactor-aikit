@@ -288,7 +288,150 @@ describe('Apple Ads MCP tools', () => {
 			scope: 'workspace:write',
 			body: { organizationId: ORGANIZATION_ID, connectionName: 'Main' },
 		})
+		// The API sends every amount in the account's own currency. A caller still passing the old
+		// field must not get a stray code through to it: a mismatch is a 400 there.
+		expect(internalCall).not.toHaveProperty('body.currency')
 	})
+
+	test('campaign update forwards startTime and endTime', async () => {
+		const bodies: Array<Record<string, unknown>> = []
+		const fixture = await createMcpAppFixture(async (request) => {
+			bodies.push((await request.json()) as Record<string, unknown>)
+			return Response.json({
+				data: { action: 'update', campaignId: 101, status: 'ENABLED' },
+				requestId: 'req-campaign-update',
+			})
+		})
+		const token = await issueAccessToken(fixture, 'workspace:write')
+		const response = await mcpRpc(
+			fixture,
+			token,
+			'tools/call',
+			{
+				name: 'manage_apple_ads_campaigns',
+				arguments: {
+					organizationId: ORGANIZATION_ID,
+					action: 'update',
+					idempotencyKey: 'idem-camp-dates',
+					campaignId: 101,
+					startTime: '2026-12-01T00:00:00.000',
+					endTime: '2026-12-31T00:00:00.000',
+				},
+				_meta: modernMeta(),
+			},
+			'manage_apple_ads_campaigns',
+		)
+		expect(response.status).toBe(200)
+		expect(bodies).toHaveLength(1)
+		// G-3: these used to have no way through at all on an update.
+		expect(bodies[0]).toMatchObject({
+			action: 'update',
+			startTime: '2026-12-01T00:00:00.000',
+			endTime: '2026-12-31T00:00:00.000',
+		})
+	})
+
+	for (const [tool, args, expected] of [
+		[
+			'manage_apple_ads_campaigns',
+			{
+				action: 'create',
+				name: 'Today Tab',
+				dailyBudget: 20,
+				countriesOrRegions: ['US'],
+				adamId: 1,
+				supplyPlacement: 'APPSTORE_TODAY_TAB',
+			},
+			{ supplyPlacement: 'APPSTORE_TODAY_TAB' },
+		],
+		[
+			// An automated-bidding campaign's ad group: no bid at all, and none invented on the way.
+			'manage_apple_ads_adgroups',
+			{ action: 'create', campaignId: 101, name: 'Auto' },
+			{ action: 'create', campaignId: 101, name: 'Auto' },
+		],
+		[
+			'manage_apple_ads_adgroups',
+			{
+				action: 'update',
+				adGroupId: 201,
+				startTime: '2026-12-01T00:00:00.000Z',
+				endTime: '2026-12-31T00:00:00.000Z',
+			},
+			{
+				startTime: '2026-12-01T00:00:00.000Z',
+				endTime: '2026-12-31T00:00:00.000Z',
+			},
+		],
+	] as const) {
+		test(`${tool} ${args.action} sends ${Object.keys(expected).join(' and ')}`, async () => {
+			// G-3: fields the API now passes on to Apple.
+			const bodies: Array<Record<string, unknown>> = []
+			const fixture = await createMcpAppFixture(async (request) => {
+				bodies.push((await request.json()) as Record<string, unknown>)
+				return Response.json({
+					data: { action: args.action, status: 'PAUSED' },
+					requestId: 'req-g3-transport',
+				})
+			})
+			const token = await issueAccessToken(fixture, 'workspace:write')
+			const response = await mcpRpc(
+				fixture,
+				token,
+				'tools/call',
+				{
+					name: tool,
+					arguments: {
+						organizationId: ORGANIZATION_ID,
+						idempotencyKey: 'idem-g3-transport',
+						...args,
+					},
+					_meta: modernMeta(),
+				},
+				tool,
+			)
+			expect(response.status).toBe(200)
+			expect(bodies).toHaveLength(1)
+			expect(bodies[0]).toMatchObject(expected)
+			// None of these cases sends a bid, and MCP must not fill one in.
+			expect(bodies[0]).not.toHaveProperty('defaultBid')
+		})
+	}
+
+	for (const [tool, idField] of [
+		['manage_apple_ads_campaigns', 'campaignId'],
+		['manage_apple_ads_adgroups', 'adGroupId'],
+	] as const) {
+		test(`${tool} no longer deletes; that is a workspace:delete tool`, async () => {
+			let upstreamCalls = 0
+			const fixture = await createMcpAppFixture(async () => {
+				upstreamCalls += 1
+				throw new Error(
+					'A delete must not reach the API through a manage tool.',
+				)
+			})
+			const token = await issueAccessToken(fixture, 'workspace:write')
+			const response = await mcpRpc(
+				fixture,
+				token,
+				'tools/call',
+				{
+					name: tool,
+					arguments: {
+						organizationId: ORGANIZATION_ID,
+						action: 'delete',
+						idempotencyKey: 'idem-old-delete',
+						[idField]: 101,
+					},
+					_meta: modernMeta(),
+				},
+				tool,
+			)
+			const body = await response.json()
+			expect(body.result?.isError).toBe(true)
+			expect(upstreamCalls).toBe(0)
+		})
+	}
 
 	test('manage_apple_ads_adgroups routes actions with idempotencyKey', async () => {
 		let receivedBody: Record<string, unknown> | null = null
@@ -414,7 +557,79 @@ describe('Apple Ads MCP tools', () => {
 			text: 'free cheats',
 			organizationId: ORGANIZATION_ID,
 		})
+		expect(receivedBody).not.toHaveProperty('adGroupId')
 	})
+
+	test('an ad group-level negative keyword is sent with adGroupId alone', async () => {
+		const bodies: Array<Record<string, unknown>> = []
+		const fixture = await createMcpAppFixture(async (request) => {
+			bodies.push((await request.json()) as Record<string, unknown>)
+			return Response.json({
+				data: { action: 'create', negativeKeywordId: 777889, status: 'ACTIVE' },
+				requestId: 'req-neg-kw-adgroup',
+			})
+		})
+		const token = await issueAccessToken(fixture, 'workspace:write')
+		const response = await mcpRpc(
+			fixture,
+			token,
+			'tools/call',
+			{
+				name: 'manage_apple_ads_negative_keywords',
+				arguments: {
+					organizationId: ORGANIZATION_ID,
+					action: 'create',
+					idempotencyKey: 'idem-neg-adgroup',
+					adGroupId: 201,
+					text: 'free',
+				},
+				_meta: modernMeta(),
+			},
+			'manage_apple_ads_negative_keywords',
+		)
+		expect(response.status).toBe(200)
+		expect(bodies).toHaveLength(1)
+		expect(bodies[0]).toMatchObject({ action: 'create', adGroupId: 201 })
+		// Apple's NegativeKeywordCreate: campaignId must not be set on an ad group-level negative.
+		expect(bodies[0]).not.toHaveProperty('campaignId')
+	})
+
+	for (const [label, scope] of [
+		['both ids', { campaignId: 101, adGroupId: 201 }],
+		['neither id', {}],
+	] as const) {
+		test(`a negative keyword create with ${label} is refused before the API`, async () => {
+			let upstreamCalls = 0
+			const fixture = await createMcpAppFixture(async () => {
+				upstreamCalls += 1
+				throw new Error('An ambiguous negative scope must not reach the API.')
+			})
+			const token = await issueAccessToken(fixture, 'workspace:write')
+			const response = await mcpRpc(
+				fixture,
+				token,
+				'tools/call',
+				{
+					name: 'manage_apple_ads_negative_keywords',
+					arguments: {
+						organizationId: ORGANIZATION_ID,
+						action: 'create',
+						idempotencyKey: 'idem-neg-ambiguous',
+						text: 'free',
+						...scope,
+					},
+					_meta: modernMeta(),
+				},
+				'manage_apple_ads_negative_keywords',
+			)
+			const body = await response.json()
+			expect(body.result?.isError).toBe(true)
+			expect(JSON.stringify(body.result?.content)).toContain(
+				'exactly one of campaignId',
+			)
+			expect(upstreamCalls).toBe(0)
+		})
+	}
 
 	test('get_apple_ads_campaigns requires workspace:read and fetches campaign list', async () => {
 		let query: Record<string, string> | undefined
@@ -610,6 +825,36 @@ describe('Apple Ads MCP tools', () => {
 		})
 	})
 
+	test('get_apple_ads_negative_keywords sends level for the ad group negatives of a campaign', async () => {
+		// The API's level=adgroup is the one query that lists every ad group-level negative in a
+		// campaign; campaignId alone now means campaign-level only (O-4).
+		let query: Record<string, string> | undefined
+		const fixture = await createMcpAppFixture(async (request) => {
+			query = Object.fromEntries(new URL(request.url).searchParams)
+			return Response.json({
+				data: { negativeKeywords: [] },
+				requestId: 'req-negs-level',
+			})
+		})
+		const token = await issueAccessToken(fixture, 'workspace:read')
+		await mcpRpc(
+			fixture,
+			token,
+			'tools/call',
+			{
+				name: 'get_apple_ads_negative_keywords',
+				arguments: {
+					campaignId: 101,
+					level: 'adgroup',
+					organizationId: ORGANIZATION_ID,
+				},
+				_meta: modernMeta(),
+			},
+			'get_apple_ads_negative_keywords',
+		)
+		expect(query).toMatchObject({ campaignId: '101', level: 'adgroup' })
+	})
+
 	test('manage_apple_ads_campaigns rejects read-only scope with 403', async () => {
 		const fixture = await createMcpAppFixture()
 		const token = await issueAccessToken(fixture, 'workspace:read')
@@ -731,12 +976,70 @@ describe('Apple Ads MCP tools', () => {
 		const kwTool = writeTools.find(
 			(t) => t.name === 'manage_apple_ads_keywords',
 		)
-		expect(kwTool?.description).toContain('max 50 per call')
-		expect(kwTool?.description).toContain('already-created keyword IDs')
+		// The contract takes one text per create; a batch the schema cannot carry must not be advertised.
+		expect(kwTool?.description).toContain('one targeting keyword per call')
+		expect(kwTool?.description).not.toContain('max 50')
 		const negTool = writeTools.find(
 			(t) => t.name === 'manage_apple_ads_negative_keywords',
 		)
-		expect(negTool?.description).toContain('adGroupId IS_NULL')
+		expect(negTool?.description).toContain('takes adGroupId alone')
+		expect(negTool?.description).not.toContain('campaignId and adGroupId')
+		const adGroupTool = writeTools.find(
+			(t) => t.name === 'manage_apple_ads_adgroups',
+		)
+		expect(adGroupTool?.description).toContain(
+			'pause and resume change only the status',
+		)
+		expect(adGroupTool?.description).toContain('MAX_CONVERSIONS')
+		expect(adGroupTool?.description).toContain(
+			'with manual bidding, create needs one',
+		)
+		expect(adGroupTool?.description).toContain('delete_apple_ads_adgroup')
+		const campaignTool = writeTools.find(
+			(t) => t.name === 'manage_apple_ads_campaigns',
+		)
+		expect(campaignTool?.description).toContain('delete_apple_ads_campaign')
+		// Keywords still delete through their manage tool; campaigns and ad groups do not.
+		for (const tool of [campaignTool, adGroupTool]) {
+			expect(tool?.description).not.toMatch(/resume, or delete/)
+		}
+	})
+
+	test('no Apple Ads write takes a currency', () => {
+		// S3: the API sends the account's own currency. A schema that still accepted one would hand the
+		// model a field to guess at, and the old USD default was a guaranteed refusal on other accounts.
+		const parsed = [
+			ManageAppleAdsCampaignRequestSchema.parse({
+				organizationId: ORGANIZATION_ID,
+				action: 'create',
+				idempotencyKey: 'idem-no-currency-1',
+				name: 'Brand',
+				dailyBudget: 10,
+				countriesOrRegions: ['DE'],
+				adamId: 1,
+				currency: 'EUR',
+			}),
+			ManageAppleAdsAdGroupRequestSchema.parse({
+				organizationId: ORGANIZATION_ID,
+				action: 'create',
+				idempotencyKey: 'idem-no-currency-2',
+				campaignId: 101,
+				name: 'Exact',
+				defaultBid: 1,
+				currency: 'EUR',
+			}),
+			ManageAppleAdsKeywordRequestSchema.parse({
+				organizationId: ORGANIZATION_ID,
+				action: 'update_bid',
+				idempotencyKey: 'idem-no-currency-3',
+				keywordId: 301,
+				bid: 1.2,
+				currency: 'EUR',
+			}),
+		]
+		for (const request of parsed) {
+			expect(request).not.toHaveProperty('currency')
+		}
 	})
 
 	test('Apple Ads write schemas share strict IdempotencyKey validation', () => {
@@ -820,7 +1123,7 @@ describe('Apple Ads MCP tools', () => {
 				'utf8',
 			),
 		) as { version: string }
-		expect(pkg.version).toBe('0.6.2')
+		expect(pkg.version).toBe('0.7.0')
 		expect(plugin.version).toBe(pkg.version)
 	})
 })

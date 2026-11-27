@@ -57,8 +57,12 @@ export const TOOL_SCOPES: Record<string, McpScope> = {
 	get_apple_ads_reports: 'analytics:read',
 	get_apple_ads_campaigns: 'workspace:read',
 	manage_apple_ads_campaigns: 'workspace:write',
+	// Apple cascades a campaign delete and restores nothing, so it sits with delete_project behind the
+	// scope a connection has to be granted on purpose, not with the writes every connection holds.
+	delete_apple_ads_campaign: 'workspace:delete',
 	get_apple_ads_adgroups: 'workspace:read',
 	manage_apple_ads_adgroups: 'workspace:write',
+	delete_apple_ads_adgroup: 'workspace:delete',
 	get_apple_ads_keywords: 'workspace:read',
 	manage_apple_ads_keywords: 'workspace:write',
 	get_apple_ads_negative_keywords: 'workspace:read',

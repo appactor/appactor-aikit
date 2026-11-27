@@ -16,7 +16,7 @@ export const IdempotencyKey = z
 		'Generate once per logical operation. After a timeout or uncertain result, retry the exact same arguments with this same key; never generate a new key for that retry.',
 	)
 const OptionalDisplayName = z.string().max(255).nullable().optional()
-const PreviewToken = z
+export const PreviewToken = z
 	.string()
 	.min(32)
 	.max(4096)
@@ -250,13 +250,18 @@ export const CreateAppRequestSchema = z.discriminatedUnion('platform', [
 		.strict(),
 ])
 
-const DeleteConfirmName = z
-	.string()
-	.min(1)
-	.max(255)
-	.describe(
-		"The name of the project or app exactly as the preview reported it, typed back by the user. Never invent this value or copy it from the preview on the user's behalf.",
-	)
+/** One wording for every delete tool's typed-back name; only the noun differs. */
+export function deleteConfirmName(what: string) {
+	return z
+		.string()
+		.min(1)
+		.max(255)
+		.describe(
+			`The name of the ${what} exactly as the preview reported it, typed back by the user. Never invent this value or copy it from the preview on the user's behalf.`,
+		)
+}
+
+const DeleteConfirmName = deleteConfirmName('project or app')
 
 export const DeleteProjectRequestSchema = z.discriminatedUnion('action', [
 	z

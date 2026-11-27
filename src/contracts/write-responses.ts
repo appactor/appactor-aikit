@@ -348,45 +348,112 @@ const DeleteImpactSchema = z
 	})
 	.strict()
 
-function deletePreview(target: 'project' | 'app') {
+function deletePreview<
+	const TTarget extends string,
+	TId extends z.ZodType,
+	TImpact extends z.ZodType,
+>(target: TTarget, targetId: TId, impact: TImpact) {
 	return z
 		.object({
 			status: z.literal('preview'),
 			target: z.literal(target),
-			targetId: Id,
+			targetId,
 			// The name the user has to type back. Deliberately NOT also echoed under the request's own
 			// field name: handing a model a `confirmName` in the response is an invitation to copy it
 			// straight into the request without anyone reading anything.
 			name: z.string(),
-			impact: DeleteImpactSchema,
+			impact,
 			previewToken: z.string(),
 			expiresAt: DateTime,
 		})
 		.strict()
 }
 
-function deleteOutcome(target: 'project' | 'app') {
+function deleteOutcome<
+	const TTarget extends string,
+	TId extends z.ZodType,
+	TExtra extends z.ZodRawShape = Record<never, never>,
+>(target: TTarget, targetId: TId, extra?: TExtra) {
 	return z
 		.object({
 			deleted: z.literal(true),
 			// True when the target was already gone: the delete was a no-op, not a failure.
 			alreadyAbsent: z.boolean(),
 			target: z.literal(target),
-			targetId: Id,
+			targetId,
 			name: z.string(),
-			impact: DeleteImpactSchema.nullable(),
+			...(extra as TExtra),
 		})
 		.strict()
 }
 
+const workspaceDeleteExtra = { impact: DeleteImpactSchema.nullable() }
+
 export const DeleteProjectResponseSchema = z.union([
-	deletePreview('project'),
-	successfulOperation('apply', deleteOutcome('project')),
+	deletePreview('project', Id, DeleteImpactSchema),
+	successfulOperation(
+		'apply',
+		deleteOutcome('project', Id, workspaceDeleteExtra),
+	),
 ])
 
 export const DeleteAppResponseSchema = z.union([
-	deletePreview('app'),
-	successfulOperation('apply', deleteOutcome('app')),
+	deletePreview('app', Id, DeleteImpactSchema),
+	successfulOperation('apply', deleteOutcome('app', Id, workspaceDeleteExtra)),
+])
+
+// Apple's own numeric ids, not AppActor uuids.
+const AppleAdsEntityId = z.number().int().positive()
+
+/**
+ * Read with GETs only; the preview never writes to Apple. Apple cascades a campaign delete to its ad
+ * groups, keywords and ads, so the ad group count is the number a human has to see before typing the
+ * name back.
+ */
+const AppleAdsCampaignDeleteImpactSchema = z
+	.object({
+		status: z.string(),
+		dailyBudget: z.number(),
+		currency: z.string(),
+		adGroups: BoundedCountSchema,
+		// Apple's own cascade sentence, from the API: the summary quotes it rather than restating it.
+		cascades: z.string(),
+	})
+	.strict()
+
+const AppleAdsAdGroupDeleteImpactSchema = z
+	.object({
+		status: z.string(),
+		campaignId: AppleAdsEntityId,
+		campaignName: z.string(),
+		targetingKeywords: BoundedCountSchema,
+		cascades: z.string(),
+	})
+	.strict()
+
+// The before-state of what was deleted (audit D-8). Absent when nothing was deleted (alreadyAbsent).
+const appleAdsDeleteExtra = {
+	previous: z.record(z.string(), z.unknown()).optional(),
+}
+
+export const DeleteAppleAdsCampaignResponseSchema = z.union([
+	deletePreview(
+		'campaign',
+		AppleAdsEntityId,
+		AppleAdsCampaignDeleteImpactSchema,
+	),
+	successfulOperation(
+		'apply',
+		deleteOutcome('campaign', AppleAdsEntityId, appleAdsDeleteExtra),
+	),
+])
+
+export const DeleteAppleAdsAdGroupResponseSchema = z.union([
+	deletePreview('adgroup', AppleAdsEntityId, AppleAdsAdGroupDeleteImpactSchema),
+	successfulOperation(
+		'apply',
+		deleteOutcome('adgroup', AppleAdsEntityId, appleAdsDeleteExtra),
+	),
 ])
 
 /**
@@ -440,6 +507,12 @@ export type DeleteAppResponse = z.infer<typeof DeleteAppResponseSchema>
 export type DeleteResponse =
 	| z.infer<typeof DeleteProjectResponseSchema>
 	| z.infer<typeof DeleteAppResponseSchema>
+export type DeleteAppleAdsCampaignResponse = z.infer<
+	typeof DeleteAppleAdsCampaignResponseSchema
+>
+export type DeleteAppleAdsAdGroupResponse = z.infer<
+	typeof DeleteAppleAdsAdGroupResponseSchema
+>
 export type UpdateAppResponse = z.infer<typeof UpdateAppResponseSchema>
 export type RefundSaverResponse = z.infer<typeof RefundSaverResponseSchema>
 export type ManageRefundSaverResponse = z.infer<
