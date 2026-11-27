@@ -345,6 +345,12 @@ describe('Apple Ads MCP tools', () => {
 			{ supplyPlacement: 'APPSTORE_TODAY_TAB' },
 		],
 		[
+			// An automated-bidding campaign's ad group: no bid at all, and none invented on the way.
+			'manage_apple_ads_adgroups',
+			{ action: 'create', campaignId: 101, name: 'Auto' },
+			{ action: 'create', campaignId: 101, name: 'Auto' },
+		],
+		[
 			'manage_apple_ads_adgroups',
 			{
 				action: 'update',
@@ -387,6 +393,8 @@ describe('Apple Ads MCP tools', () => {
 			expect(response.status).toBe(200)
 			expect(bodies).toHaveLength(1)
 			expect(bodies[0]).toMatchObject(expected)
+			// None of these cases sends a bid, and MCP must not fill one in.
+			expect(bodies[0]).not.toHaveProperty('defaultBid')
 		})
 	}
 
@@ -968,8 +976,9 @@ describe('Apple Ads MCP tools', () => {
 		const kwTool = writeTools.find(
 			(t) => t.name === 'manage_apple_ads_keywords',
 		)
-		expect(kwTool?.description).toContain('max 50 per call')
-		expect(kwTool?.description).toContain('already-created keyword IDs')
+		// The contract takes one text per create; a batch the schema cannot carry must not be advertised.
+		expect(kwTool?.description).toContain('one targeting keyword per call')
+		expect(kwTool?.description).not.toContain('max 50')
 		const negTool = writeTools.find(
 			(t) => t.name === 'manage_apple_ads_negative_keywords',
 		)
@@ -982,6 +991,9 @@ describe('Apple Ads MCP tools', () => {
 			'pause and resume change only the status',
 		)
 		expect(adGroupTool?.description).toContain('MAX_CONVERSIONS')
+		expect(adGroupTool?.description).toContain(
+			'with manual bidding, create needs one',
+		)
 		expect(adGroupTool?.description).toContain('delete_apple_ads_adgroup')
 		const campaignTool = writeTools.find(
 			(t) => t.name === 'manage_apple_ads_campaigns',

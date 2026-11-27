@@ -313,7 +313,9 @@ export const ManageAppleAdsAdGroupRequestSchema = z.discriminatedUnion(
 			idempotencyKey: IdempotencyKey,
 			campaignId: EntityId,
 			name: z.string().min(1).max(255),
-			defaultBid: AccountMoney,
+			// Optional: an automated-bidding campaign's ad groups take no bid of their own (Apple refuses a
+			// non-zero one), so requiring it made such ad groups impossible to create.
+			defaultBid: AccountMoney.optional(),
 			cpaGoal: AccountMoney.optional(),
 			searchMatch: z.boolean().default(false),
 			startTime: AdGroupStartTime.optional(),

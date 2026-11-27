@@ -107,11 +107,8 @@ like other workspace mutations:
   attempt started before sending any second `POST`, preventing duplicates (the
   Apple Ads Platform API does not guarantee unique campaign or ad group names,
   so a new key risks creating a duplicate).
-- For batch targeting keyword creation (`manage_apple_ads_keywords` `create`,
-  up to 50 keywords per call), if one or more keywords succeed before a later
-  keyword fails, the entry stays `uncertain` (never `failed`) with the
-  already-created keyword IDs and failure details saved in the error response
-  and `get_audit_log`.
+- `manage_apple_ads_keywords` `create` adds one keyword per call; for several,
+  make one call each, every one with its own `idempotencyKey`.
 - If an immediate retry after MCP's 35-second timeout returns `409 Conflict`
   because the first API request is still in flight, wait briefly and retry with
   the **same** `idempotencyKey`; do not generate a new key. If a request was
@@ -137,10 +134,12 @@ AppActor reads the ad account's currency from Apple and sends every amount in
 it. There is no currency field to fill in, and none to guess.
 
 **Ad groups:** `pause` and `resume` change only the status — the bid and every
-other setting stay as they are. In a campaign with automated bidding
-(`MAX_CONVERSIONS`) the ad groups take their bids from the campaign's strategy,
-so an ad group `defaultBid` cannot be changed there: the API refuses it. Change
-the campaign instead, or say that the bid is not settable at ad group level.
+other setting stay as they are. The ad group's `defaultBid` depends on the
+campaign's bidding: with manual bidding, `create` needs one; with automated
+bidding (`MAX_CONVERSIONS`) the ad groups take their bids from the campaign's
+strategy, so leave `defaultBid` out on `create` and `update` alike — the API
+refuses one. To change bids there, change the campaign, or say that the bid is
+not settable at ad group level.
 
 ### Delete is permanent
 

@@ -67,7 +67,7 @@ const APPLE_ADS_WRITE_ANNOTATIONS = writeToolAnnotations(true, true)
 
 const MANAGE_CAMPAIGNS_DESCRIPTION = `Create, update (name, daily budget, countries or regions, start and end time, status), pause, or resume a campaign on Apple Search Ads. update writes only the fields you send. Deleting a campaign is delete_apple_ads_campaign. ${APPLE_ADS_IDEMPOTENCY_RULE}`
 
-const MANAGE_ADGROUPS_DESCRIPTION = `Create, update (name, default bid, CPA goal, Search Match, status), pause, or resume an ad group on Apple Search Ads. pause and resume change only the status; the bid and every other setting stay as they are, and update likewise writes only the fields you send. In a campaign with automated bidding (MAX_CONVERSIONS) the ad group's bid cannot be changed: its ad groups take their bids from the campaign's strategy, and the API refuses a defaultBid. Deleting an ad group is delete_apple_ads_adgroup. ${APPLE_ADS_IDEMPOTENCY_RULE}`
+const MANAGE_ADGROUPS_DESCRIPTION = `Create, update (name, default bid, CPA goal, Search Match, status), pause, or resume an ad group on Apple Search Ads. pause and resume change only the status; the bid and every other setting stay as they are, and update likewise writes only the fields you send. The ad group's defaultBid depends on the campaign: with manual bidding, create needs one; with automated bidding (MAX_CONVERSIONS) leave it out on create and update alike, because the campaign's strategy sets the bids and the API refuses one. Deleting an ad group is delete_apple_ads_adgroup. ${APPLE_ADS_IDEMPOTENCY_RULE}`
 
 const MANAGE_NEGATIVE_KEYWORDS_DESCRIPTION = `Add or delete negative keywords on Apple Search Ads. A campaign-level negative takes campaignId alone; an ad group-level negative takes adGroupId alone, because Apple does not allow campaignId on it. ${APPLE_ADS_IDEMPOTENCY_RULE}`
 
@@ -391,7 +391,7 @@ export function registerAppleAdsTools(
 		'manage_apple_ads_keywords',
 		{
 			title: 'Manage Apple Ads Targeting Keywords',
-			description: `Create targeting keywords (max 50 per call; if a batch fails partway through, the operation stays uncertain with already-created keyword IDs recorded in the error details and get_audit_log), update bids, pause, resume, or delete keywords on Apple Search Ads. ${APPLE_ADS_IDEMPOTENCY_RULE}`,
+			description: `Create one targeting keyword per call (text, match type, bid), update its bid, pause, resume, or delete it on Apple Search Ads. ${APPLE_ADS_IDEMPOTENCY_RULE}`,
 			inputSchema: ManageAppleAdsKeywordRequestSchema,
 			outputSchema: ManageAppleAdsKeywordResponseSchema,
 			annotations: APPLE_ADS_WRITE_ANNOTATIONS,

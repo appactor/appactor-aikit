@@ -35,15 +35,22 @@
 - **`get_apple_ads_negative_keywords` takes `level`.** With `campaignId` alone
   the API now lists the campaign-level negatives; `level: "adgroup"` lists
   every ad group-level negative in that campaign.
+- **Ad group `create` no longer requires `defaultBid`.** With manual bidding it
+  is still needed; in an automated-bidding (`MAX_CONVERSIONS`) campaign it is
+  left out, where Apple refuses a bid of its own — before, MCP could not create
+  an ad group there at all.
+- **`manage_apple_ads_keywords` no longer advertises a 50-keyword batch.** The
+  tool takes one keyword per `create`, and now says so.
 - `manage_apple_ads_adgroups` now says that `pause` and `resume` change only the
-  status, and that an ad group bid cannot be changed under automated bidding
-  (`MAX_CONVERSIONS`). `appactor:asa` and `appactor:workspace` describe the new
+  status, and when `defaultBid` is sent or left out (manual versus
+  `MAX_CONVERSIONS` bidding). `appactor:asa` and `appactor:workspace` describe the new
   delete flow, single-id negatives, the account currency, and the member-level
   "all projects" requirement for Apple Ads.
 - Requires the `appactor-final-api` Apple Ads round of 27 November 2026
   (`fix/asa-yazma`). **Deploy the API first:** an older API has no
   `/apple-ads/campaigns/delete` or `/apple-ads/adgroups/delete` route, refuses
-  an ad group negative without `campaignId`, and drops campaign update dates.
+  an ad group negative without `campaignId`, drops campaign update dates, and
+  requires `defaultBid` on every ad group create.
 
 ## 0.6.2
 
