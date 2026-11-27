@@ -17,12 +17,10 @@ import {
 import { registerAppleAdsTools } from './tools/apple-ads'
 import { registerCatalogWriteTools } from './tools/catalog-writes'
 import { registerConfigTools } from './tools/config-tools'
+import { DELETE_CONFIRMATION_RULE } from './tools/delete-protocol'
 import { registerRefundTools } from './tools/refunds'
 import { registerSubscriberReadTools } from './tools/subscriber-reads'
-import {
-	DELETE_CONFIRMATION_RULE,
-	registerWorkspaceWriteTools,
-} from './tools/workspace-writes'
+import { registerWorkspaceWriteTools } from './tools/workspace-writes'
 
 // One entry per rule, joined at the end. As a single literal this was a 647-character unwrappable
 // line carrying four unrelated policies, so every edit showed up as a whole-line rewrite with no

@@ -27,37 +27,67 @@ const previewArguments = {
 	projectId: ids.project,
 } as const
 
+const campaignPreview = {
+	organizationId: ids.organization,
+	action: 'preview',
+	campaignId: 101,
+} as const
+
+const adGroupPreview = {
+	organizationId: ids.organization,
+	action: 'preview',
+	adGroupId: 201,
+} as const
+
+const appleAdsApply = {
+	organizationId: ids.organization,
+	action: 'apply',
+	idempotencyKey: 'delete-campaign-apply-1',
+	previewToken: 'p'.repeat(48),
+} as const
+
 describe('MCP delete tools', () => {
-	test('a write scope does not carry delete with it', async () => {
-		// The whole point of a separate scope: a connection approved before deletion existed must not
-		// gain it silently, and the refusal has to happen before the API is ever called.
-		let upstreamCalls = 0
-		const fixture = await createMcpAppFixture(async () => {
-			upstreamCalls += 1
-			throw new Error('Delete must not reach the API.')
-		})
-		const writeToken = await issueAccessToken(fixture, 'workspace:write')
-		const response = await mcpRpc(
-			fixture,
-			writeToken,
-			'tools/call',
+	for (const [tool, args] of [
+		['delete_project', previewArguments],
+		[
+			'delete_app',
 			{
-				name: 'delete_project',
-				arguments: previewArguments,
-				_meta: modernMeta(),
+				action: 'preview',
+				organizationId: ids.organization,
+				appId: ids.resource,
 			},
-			'delete_project',
-		)
-		expect(response.status).toBe(403)
-		// Naming the scope in the challenge is what sends the client back through consent. Asserting it
-		// also pins the TOOL_SCOPES mapping: drop delete_project from it and requiredScopeForRequest
-		// falls back to workspace:read, which this same token would still be refused for -- a green
-		// test over a broken mapping.
-		expect(response.headers.get('www-authenticate')).toContain(
-			'workspace:delete',
-		)
-		expect(upstreamCalls).toBe(0)
-	})
+		],
+		['delete_apple_ads_campaign', campaignPreview],
+		['delete_apple_ads_adgroup', adGroupPreview],
+	] as const) {
+		test(`a write scope does not carry ${tool} with it`, async () => {
+			// The whole point of a separate scope: a connection approved before deletion existed must not
+			// gain it silently, and the refusal has to happen before the API is ever called. The Apple Ads
+			// deletes used to sit under workspace:write, which every connection that created an app holds.
+			let upstreamCalls = 0
+			const fixture = await createMcpAppFixture(async () => {
+				upstreamCalls += 1
+				throw new Error('Delete must not reach the API.')
+			})
+			const writeToken = await issueAccessToken(fixture, 'workspace:write')
+			const response = await mcpRpc(
+				fixture,
+				writeToken,
+				'tools/call',
+				{ name: tool, arguments: args, _meta: modernMeta() },
+				tool,
+			)
+			expect(response.status).toBe(403)
+			// Naming the scope in the challenge is what sends the client back through consent. Asserting it
+			// also pins the TOOL_SCOPES mapping: drop a delete tool from it and requiredScopeForRequest
+			// falls back to workspace:read, which this same token would still be refused for -- a green
+			// test over a broken mapping.
+			expect(response.headers.get('www-authenticate')).toContain(
+				'workspace:delete',
+			)
+			expect(upstreamCalls).toBe(0)
+		})
+	}
 
 	test('every registered tool has a scope mapped to it', async () => {
 		// The fallback for an unmapped tool is workspace:read, which nearly every connection holds, so
@@ -259,49 +289,6 @@ describe('MCP delete tools', () => {
 	})
 
 	describe('Apple Ads campaign and ad group deletes', () => {
-		const campaignPreview = {
-			organizationId: ids.organization,
-			action: 'preview',
-			campaignId: 101,
-		} as const
-		const apply = {
-			organizationId: ids.organization,
-			action: 'apply',
-			idempotencyKey: 'delete-campaign-apply-1',
-			previewToken: 'p'.repeat(48),
-		} as const
-
-		for (const [tool, args] of [
-			['delete_apple_ads_campaign', campaignPreview],
-			[
-				'delete_apple_ads_adgroup',
-				{ organizationId: ids.organization, action: 'preview', adGroupId: 201 },
-			],
-		] as const) {
-			test(`${tool} is refused to a workspace:write token, before the API`, async () => {
-				// O-5: these sat under workspace:write, which every connection that ever created an app
-				// holds. Apple cascades a campaign delete and restores nothing.
-				let upstreamCalls = 0
-				const fixture = await createMcpAppFixture(async () => {
-					upstreamCalls += 1
-					throw new Error('Delete must not reach the API.')
-				})
-				const token = await issueAccessToken(fixture, 'workspace:write')
-				const response = await mcpRpc(
-					fixture,
-					token,
-					'tools/call',
-					{ name: tool, arguments: args, _meta: modernMeta() },
-					tool,
-				)
-				expect(response.status).toBe(403)
-				expect(response.headers.get('www-authenticate')).toContain(
-					'workspace:delete',
-				)
-				expect(upstreamCalls).toBe(0)
-			})
-		}
-
 		test('the campaign preview names the target, its cascade and who must confirm', async () => {
 			const fixture = await createMcpAppFixture(async () =>
 				Response.json({
@@ -348,11 +335,7 @@ describe('MCP delete tools', () => {
 				'tools/call',
 				{
 					name: 'delete_apple_ads_adgroup',
-					arguments: {
-						organizationId: ids.organization,
-						action: 'preview',
-						adGroupId: 201,
-					},
+					arguments: adGroupPreview,
 					_meta: modernMeta(),
 				},
 				'delete_apple_ads_adgroup',
@@ -386,7 +369,10 @@ describe('MCP delete tools', () => {
 				'tools/call',
 				{
 					name: 'delete_apple_ads_campaign',
-					arguments: { ...apply, confirmName: 'brand us (typed wrong)' },
+					arguments: {
+						...appleAdsApply,
+						confirmName: 'brand us (typed wrong)',
+					},
 					_meta: modernMeta(),
 				},
 				'delete_apple_ads_campaign',
@@ -397,33 +383,36 @@ describe('MCP delete tools', () => {
 			)
 			expect(bodies).toHaveLength(1)
 			expect(bodies[0]).toEqual({
-				...apply,
+				...appleAdsApply,
 				confirmName: 'brand us (typed wrong)',
 			})
 		})
 
-		test('an apply carrying a campaignId is refused: the token names the target', async () => {
-			let upstreamCalls = 0
-			const fixture = await createMcpAppFixture(async () => {
-				upstreamCalls += 1
-				throw new Error('Must not reach the API.')
+		for (const extra of [{ campaignId: 999 }, { connectionName: 'Other' }]) {
+			test(`an apply carrying ${Object.keys(extra)[0]} is refused: the token names the target`, async () => {
+				// Re-selecting either on apply would let an approved token be aimed somewhere else.
+				let upstreamCalls = 0
+				const fixture = await createMcpAppFixture(async () => {
+					upstreamCalls += 1
+					throw new Error('Must not reach the API.')
+				})
+				const token = await issueAccessToken(fixture, 'workspace:delete')
+				const response = await mcpRpc(
+					fixture,
+					token,
+					'tools/call',
+					{
+						name: 'delete_apple_ads_campaign',
+						arguments: { ...appleAdsApply, confirmName: 'Brand US', ...extra },
+						_meta: modernMeta(),
+					},
+					'delete_apple_ads_campaign',
+				)
+				const body = await response.json()
+				expect(body.result?.isError).toBe(true)
+				expect(upstreamCalls).toBe(0)
 			})
-			const token = await issueAccessToken(fixture, 'workspace:delete')
-			const response = await mcpRpc(
-				fixture,
-				token,
-				'tools/call',
-				{
-					name: 'delete_apple_ads_campaign',
-					arguments: { ...apply, confirmName: 'Brand US', campaignId: 999 },
-					_meta: modernMeta(),
-				},
-				'delete_apple_ads_campaign',
-			)
-			const body = await response.json()
-			expect(body.result?.isError).toBe(true)
-			expect(upstreamCalls).toBe(0)
-		})
+		}
 
 		test('reports an already-deleted ad group as done', async () => {
 			const fixture = await createMcpAppFixture(async () =>
@@ -442,7 +431,7 @@ describe('MCP delete tools', () => {
 				{
 					name: 'delete_apple_ads_adgroup',
 					arguments: {
-						...apply,
+						...appleAdsApply,
 						idempotencyKey: 'delete-adgroup-retry-1',
 						confirmName: 'Exact Match',
 					},

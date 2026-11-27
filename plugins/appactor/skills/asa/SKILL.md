@@ -158,8 +158,8 @@ form of almost every "turn it off" request; offer it first.
 2. `action: "apply"` in a **later** turn, with the token, a new
    `idempotencyKey`, and `confirmName` set to the name the user typed in a
    message of their own — not the one from their request or the preview. No
-   entity id: the token names the target. With no person there to type it, do
-   not call apply at all.
+   entity id and no `connectionName`: the token names the target and the
+   connection. With no person there to type it, do not call apply at all.
 
 They need the `workspace:delete` scope. A connection approved without it gets a
 403 `insufficient_scope` on the first call; the user has to reconnect it to

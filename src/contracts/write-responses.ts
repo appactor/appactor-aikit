@@ -369,37 +369,37 @@ function deletePreview<
 		.strict()
 }
 
-function deleteOutcomeShape<
+function deleteOutcome<
 	const TTarget extends string,
 	TId extends z.ZodType,
->(target: TTarget, targetId: TId) {
-	return {
-		deleted: z.literal(true),
-		// True when the target was already gone: the delete was a no-op, not a failure.
-		alreadyAbsent: z.boolean(),
-		target: z.literal(target),
-		targetId,
-		name: z.string(),
-	}
-}
-
-function workspaceDeleteOutcome(target: 'project' | 'app') {
+	TExtra extends z.ZodRawShape = Record<never, never>,
+>(target: TTarget, targetId: TId, extra?: TExtra) {
 	return z
 		.object({
-			...deleteOutcomeShape(target, Id),
-			impact: DeleteImpactSchema.nullable(),
+			deleted: z.literal(true),
+			// True when the target was already gone: the delete was a no-op, not a failure.
+			alreadyAbsent: z.boolean(),
+			target: z.literal(target),
+			targetId,
+			name: z.string(),
+			...(extra as TExtra),
 		})
 		.strict()
 }
 
+const workspaceDeleteExtra = { impact: DeleteImpactSchema.nullable() }
+
 export const DeleteProjectResponseSchema = z.union([
 	deletePreview('project', Id, DeleteImpactSchema),
-	successfulOperation('apply', workspaceDeleteOutcome('project')),
+	successfulOperation(
+		'apply',
+		deleteOutcome('project', Id, workspaceDeleteExtra),
+	),
 ])
 
 export const DeleteAppResponseSchema = z.union([
 	deletePreview('app', Id, DeleteImpactSchema),
-	successfulOperation('apply', workspaceDeleteOutcome('app')),
+	successfulOperation('apply', deleteOutcome('app', Id, workspaceDeleteExtra)),
 ])
 
 // Apple's own numeric ids, not AppActor uuids.
@@ -426,22 +426,18 @@ const AppleAdsAdGroupDeleteImpactSchema = z
 	})
 	.strict()
 
-function appleAdsDeleteOutcome(target: 'campaign' | 'adgroup') {
-	return z.object(deleteOutcomeShape(target, AppleAdsEntityId)).strict()
-}
-
 export const DeleteAppleAdsCampaignResponseSchema = z.union([
 	deletePreview(
 		'campaign',
 		AppleAdsEntityId,
 		AppleAdsCampaignDeleteImpactSchema,
 	),
-	successfulOperation('apply', appleAdsDeleteOutcome('campaign')),
+	successfulOperation('apply', deleteOutcome('campaign', AppleAdsEntityId)),
 ])
 
 export const DeleteAppleAdsAdGroupResponseSchema = z.union([
 	deletePreview('adgroup', AppleAdsEntityId, AppleAdsAdGroupDeleteImpactSchema),
-	successfulOperation('apply', appleAdsDeleteOutcome('adgroup')),
+	successfulOperation('apply', deleteOutcome('adgroup', AppleAdsEntityId)),
 ])
 
 /**

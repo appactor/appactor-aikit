@@ -7,7 +7,8 @@
   `delete_apple_ads_adgroup`, work like `delete_project`: `preview` reads the
   target with GETs only and returns its name, status, impact and a five-minute
   `previewToken`; `apply`, in a later turn, takes that token, an
-  `idempotencyKey` and `confirmName`. The `delete` action is gone from
+  `idempotencyKey` and `confirmName`, and no entity id or `connectionName`:
+  the token carries both. The `delete` action is gone from
   `manage_apple_ads_campaigns` and `manage_apple_ads_adgroups`. Before this, a
   connection holding `workspace:write` could delete a live campaign tree in one
   call, and Apple restores none of it.
@@ -23,6 +24,9 @@
 - **Campaign `update` carries `startTime` and `endTime`** instead of having no
   way to move them. Neither accepts `null` any more: Apple documents an absent
   `endTime` as "no end date" and documents no null.
+- Ad group `create` `endTime` no longer accepts `null` either (Apple: leave it
+  out to inherit the campaign's end date), and `cpaGoal` is described as an
+  amount in the account's currency like the other money fields.
 - **Campaign `create` no longer takes `supplySources`.** The API never passed
   it on, so every campaign landed on Search Results whatever was sent.
 - `manage_apple_ads_adgroups` now says that `pause` and `resume` change only the

@@ -25,7 +25,6 @@ import {
 	ManageAppleAdsKeywordResponseSchema,
 	ManageAppleAdsNegativeKeywordRequestSchema,
 	ManageAppleAdsNegativeKeywordResponseSchema,
-	NEGATIVE_KEYWORD_SCOPE_RULE,
 } from '../contracts/apple-ads'
 import {
 	type DeleteAppleAdsAdGroupResponse,
@@ -42,9 +41,10 @@ import {
 } from '../tool-runtime'
 import {
 	DELETE_PROTOCOL,
-	DELETE_STOP_REMINDER,
 	countLabel,
-} from './workspace-writes'
+	deleteOutcomeSummary,
+	deletePreviewSummary,
+} from './delete-protocol'
 
 /**
  * Apple Ads writes run through the API's `mcp_write_operations` idempotency
@@ -69,32 +69,36 @@ const MANAGE_CAMPAIGNS_DESCRIPTION = `Create, update (name, daily budget, countr
 
 const MANAGE_ADGROUPS_DESCRIPTION = `Create, update (name, default bid, CPA goal, Search Match, status), pause, or resume an ad group on Apple Search Ads. pause and resume change only the status; the bid and every other setting stay as they are, and update likewise writes only the fields you send. In a campaign with automated bidding (MAX_CONVERSIONS) the ad group's bid cannot be changed: its ad groups take their bids from the campaign's strategy, and the API refuses a defaultBid. Deleting an ad group is delete_apple_ads_adgroup. ${APPLE_ADS_IDEMPOTENCY_RULE}`
 
-const MANAGE_NEGATIVE_KEYWORDS_DESCRIPTION = `Add or delete negative keywords on Apple Search Ads. ${NEGATIVE_KEYWORD_SCOPE_RULE} ${APPLE_ADS_IDEMPOTENCY_RULE}`
+const MANAGE_NEGATIVE_KEYWORDS_DESCRIPTION = `Add or delete negative keywords on Apple Search Ads. A campaign-level negative takes campaignId alone; an ad group-level negative takes adGroupId alone, because Apple does not allow campaignId on it. ${APPLE_ADS_IDEMPOTENCY_RULE}`
 
 const DELETE_CAMPAIGN_DESCRIPTION = `Permanently delete an Apple Ads campaign. Apple deletes its ad groups, keywords and ads with it and restores none of them; pausing it with manage_apple_ads_campaigns is the reversible way to stop its spend. ${DELETE_PROTOCOL}`
 
 const DELETE_ADGROUP_DESCRIPTION = `Permanently delete one Apple Ads ad group; Apple cannot restore it. Pausing it with manage_apple_ads_adgroups is the reversible way to stop it. ${DELETE_PROTOCOL}`
 
+const APPLE_ADS_DELETE_LABEL = {
+	campaign: 'Apple Ads campaign',
+	adgroup: 'Apple Ads ad group',
+} as const
+
 /**
- * The preview sentence is what the user is asked to approve by typing the name back, so it names the
- * target, its state and what goes with it. The target is read off the response, as in
- * workspace-writes' deleteSummary.
+ * The preview names the target, its state and what goes with it. The target is read off the
+ * response, as in workspace-writes' deleteSummary.
  */
 function appleAdsDeleteSummary(
 	result: DeleteAppleAdsCampaignResponse | DeleteAppleAdsAdGroupResponse,
 ) {
-	if (result.status !== 'preview') {
-		const { target, name, alreadyAbsent } = result.result
-		const label = target === 'campaign' ? 'campaign' : 'ad group'
-		if (alreadyAbsent)
-			return `The Apple Ads ${label} "${name}" was already deleted; nothing to do.`
-		return `Apple Ads ${label} "${name}" deleted${result.replayed ? ' (replayed)' : ''}.`
-	}
-	const what =
+	if (result.status !== 'preview')
+		return deleteOutcomeSummary(
+			APPLE_ADS_DELETE_LABEL[result.result.target],
+			result.result,
+			result.replayed,
+		)
+	const target = `the ${APPLE_ADS_DELETE_LABEL[result.target]} "${result.name}" (ID ${result.targetId}, ${result.impact.status})`
+	return deletePreviewSummary(
 		result.target === 'campaign'
-			? `the Apple Ads campaign "${result.name}" (ID ${result.targetId}, ${result.impact.status}) permanently deletes it and its ${countLabel(result.impact.adGroups)} ad group(s), with their keywords and ads`
-			: `the Apple Ads ad group "${result.name}" (ID ${result.targetId}, ${result.impact.status}) in campaign "${result.impact.campaignName}" permanently deletes it and its ${countLabel(result.impact.targetingKeywords)} targeting keyword(s)`
-	return `Deleting ${what}. This cannot be undone.\n\n${DELETE_STOP_REMINDER}`
+			? `Deleting ${target} permanently deletes it and its ${countLabel(result.impact.adGroups)} ad group(s), with their keywords and ads.`
+			: `Deleting ${target} in campaign "${result.impact.campaignName}" permanently deletes it and its ${countLabel(result.impact.targetingKeywords)} targeting keyword(s).`,
+	)
 }
 
 export function registerAppleAdsTools(

@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { IdempotencyKey, PreviewToken } from './write'
+import { IdempotencyKey, PreviewToken, deleteConfirmName } from './write'
 
 const EntityId = z.union([
 	z.number().int().positive(),
@@ -19,9 +19,8 @@ const AccountMoney = z
 		"Amount in the Apple Ads account's own currency; AppActor reads that currency from Apple, so there is no currency field.",
 	)
 
-// Apple's CampaignUpdate documents both as `yyyy-MM-dd'T'HH:mm:ss.SSS` in UTC, and an absent endTime as
-// "running indefinitely". It documents no null, so none is accepted: on an update, absent means
-// unchanged.
+// Apple documents an absent endTime as the default (a campaign runs indefinitely, an ad group inherits
+// the campaign's end) and documents no null, so none is accepted. On an update, absent means unchanged.
 const CampaignStartTime = z
 	.string()
 	.describe('Start date and time in UTC, e.g. 2026-12-01T00:00:00.000.')
@@ -30,10 +29,14 @@ const CampaignEndTime = z
 	.describe(
 		'End date and time in UTC, e.g. 2026-12-31T00:00:00.000. Leave it out for no end date, or on update to keep the current one.',
 	)
-
-/** Stated once: the tool description composes it, and the refinement below enforces it. */
-export const NEGATIVE_KEYWORD_SCOPE_RULE =
-	'A campaign-level negative takes campaignId alone; an ad group-level negative takes adGroupId alone, because Apple does not allow campaignId on it.'
+const AdGroupStartTime = z
+	.string()
+	.describe('Start date and time, ISO 8601, e.g. 2026-12-01T00:00:00.000Z.')
+const AdGroupEndTime = z
+	.string()
+	.describe(
+		"End date and time, ISO 8601. Leave it out to inherit the campaign's end date.",
+	)
 
 // ── Base & Credential Selection ─────────────────────────────────────────────
 
@@ -300,10 +303,10 @@ export const ManageAppleAdsAdGroupRequestSchema = z.discriminatedUnion(
 			campaignId: EntityId,
 			name: z.string().min(1).max(255),
 			defaultBid: AccountMoney,
-			cpaGoal: z.number().positive().optional(),
+			cpaGoal: AccountMoney.optional(),
 			searchMatch: z.boolean().default(false),
-			startTime: z.string().optional(),
-			endTime: z.string().nullable().optional(),
+			startTime: AdGroupStartTime.optional(),
+			endTime: AdGroupEndTime.optional(),
 			automatedKeywordsOptIn: z.boolean().optional(),
 		}),
 		AppleAdsSelectorSchema.extend({
@@ -312,7 +315,7 @@ export const ManageAppleAdsAdGroupRequestSchema = z.discriminatedUnion(
 			adGroupId: EntityId,
 			name: z.string().min(1).max(255).optional(),
 			defaultBid: AccountMoney.optional(),
-			cpaGoal: z.number().positive().nullable().optional(),
+			cpaGoal: AccountMoney.nullable().optional(),
 			searchMatch: z.boolean().optional(),
 			status: z.enum(['ENABLED', 'PAUSED']).optional(),
 		}),
@@ -527,33 +530,18 @@ export type ManageAppleAdsNegativeKeywordResponse = z.infer<
 
 // ── Deletes: preview, then apply in a later turn ────────────────────────────
 
-const AppleAdsDeleteConfirmName = z
-	.string()
-	.min(1)
-	.max(255)
-	.describe(
-		"The campaign or ad group name exactly as the preview reported it, typed back by the user. Never invent this value or copy it from the preview on the user's behalf.",
-	)
-
-// No entity id: the token carries the campaign or ad group it was signed for, as delete_project's
-// apply carries no projectId.
-const AppleAdsDeleteApplySchema = AppleAdsSelectorSchema.extend({
-	// Its own schema rather than the selector's: that one says when to leave it out, and here the
-	// answer is "only if the preview left it out too".
-	connectionName: z
-		.string()
-		.trim()
-		.min(1)
-		.max(255)
-		.optional()
-		.describe(
-			'The same connectionName the preview was called with; leave it out only if the preview did.',
-		),
-	action: z.literal('apply'),
-	idempotencyKey: IdempotencyKey,
-	previewToken: PreviewToken,
-	confirmName: AppleAdsDeleteConfirmName,
-}).strict()
+// No entity id and no connectionName: the token carries the connection and the campaign or ad group
+// it was signed for, as delete_project's apply carries no projectId. Re-selecting the connection on
+// apply would let a different name aim an approved token at other credentials.
+const AppleAdsDeleteApplySchema = z
+	.object({
+		organizationId: AppleAdsSelectorSchema.shape.organizationId,
+		action: z.literal('apply'),
+		idempotencyKey: IdempotencyKey,
+		previewToken: PreviewToken,
+		confirmName: deleteConfirmName('campaign or ad group'),
+	})
+	.strict()
 
 export const DeleteAppleAdsCampaignRequestSchema = z.discriminatedUnion(
 	'action',

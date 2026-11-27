@@ -171,21 +171,24 @@ export function deleteOutcome(
 	)
 }
 
-/**
- * Apple Ads deletes report Apple's numeric ids and their own impact shapes: a campaign counts its ad
- * groups, an ad group names its campaign and counts its targeting keywords.
- */
-export const appleAdsCampaignDeleteImpact = {
-	status: 'ENABLED',
-	adGroups: { count: 3, atLeast: false },
-}
-
 export const appleAdsAdGroupDeleteImpact = {
 	status: 'PAUSED',
 	campaignId: 101,
 	campaignName: 'Brand US',
 	targetingKeywords: { count: 1000, atLeast: true },
 }
+
+/**
+ * Apple Ads deletes report Apple's numeric ids and their own impact shapes: a campaign counts its ad
+ * groups, an ad group names its campaign and counts its targeting keywords.
+ */
+const appleAdsDeleteTargets = {
+	campaign: {
+		targetId: 101,
+		impact: { status: 'ENABLED', adGroups: { count: 3, atLeast: false } },
+	},
+	adgroup: { targetId: 201, impact: appleAdsAdGroupDeleteImpact },
+} as const
 
 export function appleAdsDeletePreview(
 	target: 'campaign' | 'adgroup',
@@ -194,12 +197,8 @@ export function appleAdsDeletePreview(
 	return {
 		status: 'preview' as const,
 		target,
-		targetId: target === 'campaign' ? 101 : 201,
 		name,
-		impact:
-			target === 'campaign'
-				? appleAdsCampaignDeleteImpact
-				: appleAdsAdGroupDeleteImpact,
+		...appleAdsDeleteTargets[target],
 		previewToken: 'p'.repeat(48),
 		expiresAt: timestamp,
 	}
@@ -216,7 +215,7 @@ export function appleAdsDeleteOutcome(
 			deleted: true as const,
 			alreadyAbsent: overrides.alreadyAbsent ?? false,
 			target,
-			targetId: target === 'campaign' ? 101 : 201,
+			targetId: appleAdsDeleteTargets[target].targetId,
 			name,
 		},
 		overrides.replayed ?? false,

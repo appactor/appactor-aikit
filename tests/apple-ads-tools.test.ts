@@ -290,9 +290,7 @@ describe('Apple Ads MCP tools', () => {
 		})
 		// The API sends every amount in the account's own currency. A caller still passing the old
 		// field must not get a stray code through to it: a mismatch is a 400 there.
-		expect(
-			(internalCall as unknown as { body: Record<string, unknown> }).body,
-		).not.toHaveProperty('currency')
+		expect(internalCall).not.toHaveProperty('body.currency')
 	})
 
 	test('campaign update forwards startTime and endTime', async () => {
