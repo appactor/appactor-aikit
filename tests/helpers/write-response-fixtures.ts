@@ -171,6 +171,58 @@ export function deleteOutcome(
 	)
 }
 
+/**
+ * Apple Ads deletes report Apple's numeric ids and their own impact shapes: a campaign counts its ad
+ * groups, an ad group names its campaign and counts its targeting keywords.
+ */
+export const appleAdsCampaignDeleteImpact = {
+	status: 'ENABLED',
+	adGroups: { count: 3, atLeast: false },
+}
+
+export const appleAdsAdGroupDeleteImpact = {
+	status: 'PAUSED',
+	campaignId: 101,
+	campaignName: 'Brand US',
+	targetingKeywords: { count: 1000, atLeast: true },
+}
+
+export function appleAdsDeletePreview(
+	target: 'campaign' | 'adgroup',
+	name: string,
+) {
+	return {
+		status: 'preview' as const,
+		target,
+		targetId: target === 'campaign' ? 101 : 201,
+		name,
+		impact:
+			target === 'campaign'
+				? appleAdsCampaignDeleteImpact
+				: appleAdsAdGroupDeleteImpact,
+		previewToken: 'p'.repeat(48),
+		expiresAt: timestamp,
+	}
+}
+
+export function appleAdsDeleteOutcome(
+	target: 'campaign' | 'adgroup',
+	name: string,
+	overrides: { alreadyAbsent?: boolean; replayed?: boolean } = {},
+) {
+	return succeeded(
+		'apply',
+		{
+			deleted: true as const,
+			alreadyAbsent: overrides.alreadyAbsent ?? false,
+			target,
+			targetId: target === 'campaign' ? 101 : 201,
+			name,
+		},
+		overrides.replayed ?? false,
+	)
+}
+
 export const appleWebhookVerified = {
 	state: 'verified' as const,
 	source: 'test_notification' as const,

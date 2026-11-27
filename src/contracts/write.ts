@@ -16,7 +16,7 @@ export const IdempotencyKey = z
 		'Generate once per logical operation. After a timeout or uncertain result, retry the exact same arguments with this same key; never generate a new key for that retry.',
 	)
 const OptionalDisplayName = z.string().max(255).nullable().optional()
-const PreviewToken = z
+export const PreviewToken = z
 	.string()
 	.min(32)
 	.max(4096)

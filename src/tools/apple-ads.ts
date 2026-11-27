@@ -3,6 +3,8 @@ import type { AppActorApiClient } from '../appactor-api'
 import {
 	AppleAdsReportRequestSchema,
 	AppleAdsReportResponseSchema,
+	DeleteAppleAdsAdGroupRequestSchema,
+	DeleteAppleAdsCampaignRequestSchema,
 	GetAppleAdsAdGroupsRequestSchema,
 	GetAppleAdsAdGroupsResponseSchema,
 	GetAppleAdsCampaignsRequestSchema,
@@ -25,12 +27,23 @@ import {
 	ManageAppleAdsNegativeKeywordResponseSchema,
 } from '../contracts/apple-ads'
 import {
+	type DeleteAppleAdsAdGroupResponse,
+	DeleteAppleAdsAdGroupResponseSchema,
+	type DeleteAppleAdsCampaignResponse,
+	DeleteAppleAdsCampaignResponseSchema,
+} from '../contracts/write-responses'
+import {
 	READ_TOOL_ANNOTATIONS_OPEN_WORLD,
 	errorResult,
 	requirePrincipal,
 	successResult,
 	writeToolAnnotations,
 } from '../tool-runtime'
+import {
+	DELETE_PROTOCOL,
+	DELETE_STOP_REMINDER,
+	countLabel,
+} from './workspace-writes'
 
 /**
  * Apple Ads writes run through the API's `mcp_write_operations` idempotency
@@ -50,6 +63,38 @@ export const APPLE_ADS_IDEMPOTENCY_RULE =
 	'Idempotent via idempotencyKey (backed by the API write ledger and visible in get_audit_log): replaying a succeeded key returns the stored result, and create calls never blindly re-POST on 5xx/network errors — any second POST only happens after searching Apple Ads for recently created objects when you retry the exact same idempotencyKey and arguments. If retrying after MCP 35s timeout returns 409 Conflict (still in flight on API), wait briefly and retry with the same idempotencyKey (retrying after 5 minutes of inactivity transitions an interrupted pending record to uncertain and reclaims it) — never generate a new key (Platform API does not guarantee name uniqueness).'
 
 const APPLE_ADS_WRITE_ANNOTATIONS = writeToolAnnotations(true, true)
+
+const MANAGE_CAMPAIGNS_DESCRIPTION = `Create, update (name, daily budget, countries or regions, start and end time, status), pause, or resume a campaign on Apple Search Ads. Amounts are in the Apple Ads account's own currency. update writes only the fields you send. Deleting a campaign is delete_apple_ads_campaign. ${APPLE_ADS_IDEMPOTENCY_RULE}`
+
+const MANAGE_ADGROUPS_DESCRIPTION = `Create, update (name, default bid, CPA goal, Search Match, status), pause, or resume an ad group on Apple Search Ads. pause and resume change only the status; the bid and every other setting stay as they are, and update likewise writes only the fields you send. In a campaign with automated bidding (MAX_CONVERSIONS) the ad group's bid cannot be changed: its ad groups take their bids from the campaign's strategy, and the API refuses a defaultBid. Deleting an ad group is delete_apple_ads_adgroup. ${APPLE_ADS_IDEMPOTENCY_RULE}`
+
+const MANAGE_NEGATIVE_KEYWORDS_DESCRIPTION = `Add or delete negative keywords on Apple Search Ads. A campaign-level negative takes campaignId alone; an ad group-level negative takes adGroupId alone, because Apple does not allow campaignId on it. ${APPLE_ADS_IDEMPOTENCY_RULE}`
+
+const DELETE_CAMPAIGN_DESCRIPTION = `Permanently delete an Apple Ads campaign. Apple deletes its ad groups, keywords and ads with it and restores none of them; pausing it with manage_apple_ads_campaigns is the reversible way to stop its spend. ${DELETE_PROTOCOL}`
+
+const DELETE_ADGROUP_DESCRIPTION = `Permanently delete one Apple Ads ad group; Apple cannot restore it. Pausing it with manage_apple_ads_adgroups is the reversible way to stop it. ${DELETE_PROTOCOL}`
+
+/**
+ * The preview sentence is what the user is asked to approve by typing the name back, so it names the
+ * target, its state and what goes with it. The target is read off the response, as in
+ * workspace-writes' deleteSummary.
+ */
+function appleAdsDeleteSummary(
+	result: DeleteAppleAdsCampaignResponse | DeleteAppleAdsAdGroupResponse,
+) {
+	if (result.status !== 'preview') {
+		const { target, name, alreadyAbsent } = result.result
+		const label = target === 'campaign' ? 'campaign' : 'ad group'
+		if (alreadyAbsent)
+			return `The Apple Ads ${label} "${name}" was already deleted; nothing to do.`
+		return `Apple Ads ${label} "${name}" deleted${result.replayed ? ' (replayed)' : ''}.`
+	}
+	const what =
+		result.target === 'campaign'
+			? `the Apple Ads campaign "${result.name}" (ID ${result.targetId}, ${result.impact.status}) permanently deletes it and its ${countLabel(result.impact.adGroups)} ad group(s), with their keywords and ads`
+			: `the Apple Ads ad group "${result.name}" (ID ${result.targetId}, ${result.impact.status}) in campaign "${result.impact.campaignName}" permanently deletes it and its ${countLabel(result.impact.targetingKeywords)} targeting keyword(s)`
+	return `Deleting ${what}. This cannot be undone.\n\n${DELETE_STOP_REMINDER}`
+}
 
 export function registerAppleAdsTools(
 	server: McpServer,
@@ -177,7 +222,7 @@ export function registerAppleAdsTools(
 		'manage_apple_ads_campaigns',
 		{
 			title: 'Manage Apple Ads Campaigns',
-			description: `Create, update (budget/name), pause, resume, or delete a campaign on Apple Search Ads. ${APPLE_ADS_IDEMPOTENCY_RULE}`,
+			description: MANAGE_CAMPAIGNS_DESCRIPTION,
 			inputSchema: ManageAppleAdsCampaignRequestSchema,
 			outputSchema: ManageAppleAdsCampaignResponseSchema,
 			annotations: APPLE_ADS_WRITE_ANNOTATIONS,
@@ -196,6 +241,29 @@ export function registerAppleAdsTools(
 				)
 			} catch (error) {
 				return errorResult(error, true)
+			}
+		},
+	)
+
+	server.registerTool(
+		'delete_apple_ads_campaign',
+		{
+			title: 'Delete Apple Ads Campaign',
+			description: DELETE_CAMPAIGN_DESCRIPTION,
+			inputSchema: DeleteAppleAdsCampaignRequestSchema,
+			outputSchema: DeleteAppleAdsCampaignResponseSchema,
+			annotations: APPLE_ADS_WRITE_ANNOTATIONS,
+		},
+		async (request) => {
+			try {
+				const principal = requirePrincipal(authInfo, 'workspace:delete')
+				const result = await api.deleteAppleAdsCampaign(
+					{ ...principal, tool: 'delete_apple_ads_campaign' },
+					request,
+				)
+				return successResult(result, appleAdsDeleteSummary(result))
+			} catch (error) {
+				return errorResult(error, 'idempotencyKey' in request)
 			}
 		},
 	)
@@ -236,7 +304,7 @@ export function registerAppleAdsTools(
 		'manage_apple_ads_adgroups',
 		{
 			title: 'Manage Apple Ads AdGroups',
-			description: `Create, update bid/CPA, pause, resume, or delete an adgroup on Apple Search Ads. ${APPLE_ADS_IDEMPOTENCY_RULE}`,
+			description: MANAGE_ADGROUPS_DESCRIPTION,
 			inputSchema: ManageAppleAdsAdGroupRequestSchema,
 			outputSchema: ManageAppleAdsAdGroupResponseSchema,
 			annotations: APPLE_ADS_WRITE_ANNOTATIONS,
@@ -255,6 +323,29 @@ export function registerAppleAdsTools(
 				)
 			} catch (error) {
 				return errorResult(error, true)
+			}
+		},
+	)
+
+	server.registerTool(
+		'delete_apple_ads_adgroup',
+		{
+			title: 'Delete Apple Ads AdGroup',
+			description: DELETE_ADGROUP_DESCRIPTION,
+			inputSchema: DeleteAppleAdsAdGroupRequestSchema,
+			outputSchema: DeleteAppleAdsAdGroupResponseSchema,
+			annotations: APPLE_ADS_WRITE_ANNOTATIONS,
+		},
+		async (request) => {
+			try {
+				const principal = requirePrincipal(authInfo, 'workspace:delete')
+				const result = await api.deleteAppleAdsAdGroup(
+					{ ...principal, tool: 'delete_apple_ads_adgroup' },
+					request,
+				)
+				return successResult(result, appleAdsDeleteSummary(result))
+			} catch (error) {
+				return errorResult(error, 'idempotencyKey' in request)
 			}
 		},
 	)
@@ -351,7 +442,7 @@ export function registerAppleAdsTools(
 		'manage_apple_ads_negative_keywords',
 		{
 			title: 'Manage Apple Ads Negative Keywords',
-			description: `Add or delete negative keywords at campaign level (pass campaignId without adGroupId; uncertain retries match campaignId with adGroupId IS_NULL) or adgroup level (pass campaignId and adGroupId) on Apple Search Ads. ${APPLE_ADS_IDEMPOTENCY_RULE}`,
+			description: MANAGE_NEGATIVE_KEYWORDS_DESCRIPTION,
 			inputSchema: ManageAppleAdsNegativeKeywordRequestSchema,
 			outputSchema: ManageAppleAdsNegativeKeywordResponseSchema,
 			annotations: APPLE_ADS_WRITE_ANNOTATIONS,

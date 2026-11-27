@@ -13,6 +13,10 @@ import {
 	AppleAdsReportRequestSchema,
 	AppleAdsReportResponseSchema,
 	type AppleAdsSelector,
+	type DeleteAppleAdsAdGroupRequest,
+	DeleteAppleAdsAdGroupRequestSchema,
+	type DeleteAppleAdsCampaignRequest,
+	DeleteAppleAdsCampaignRequestSchema,
 	type GetAppleAdsAdGroupsRequest,
 	GetAppleAdsAdGroupsRequestSchema,
 	GetAppleAdsAdGroupsResponseSchema,
@@ -86,6 +90,8 @@ import {
 	CreateAppResponseSchema,
 	CreateProjectResponseSchema,
 	DeleteAppResponseSchema,
+	DeleteAppleAdsAdGroupResponseSchema,
+	DeleteAppleAdsCampaignResponseSchema,
 	DeleteProjectResponseSchema,
 	ManageEntitlementsResponseSchema,
 	ManageOfferingsResponseSchema,
@@ -566,6 +572,19 @@ export class AppActorApiClient {
 		)
 	}
 
+	deleteAppleAdsCampaign(
+		auth: InternalToolPrincipal,
+		request: DeleteAppleAdsCampaignRequest,
+	) {
+		return this.postValidated(
+			'/v1/internal/mcp/apple-ads/campaigns/delete',
+			auth,
+			request,
+			DeleteAppleAdsCampaignRequestSchema,
+			DeleteAppleAdsCampaignResponseSchema,
+		)
+	}
+
 	getAppleAdsAdGroups(
 		auth: InternalToolPrincipal,
 		request: GetAppleAdsAdGroupsRequest,
@@ -596,6 +615,19 @@ export class AppActorApiClient {
 			request,
 			ManageAppleAdsAdGroupRequestSchema,
 			ManageAppleAdsAdGroupResponseSchema,
+		)
+	}
+
+	deleteAppleAdsAdGroup(
+		auth: InternalToolPrincipal,
+		request: DeleteAppleAdsAdGroupRequest,
+	) {
+		return this.postValidated(
+			'/v1/internal/mcp/apple-ads/adgroups/delete',
+			auth,
+			request,
+			DeleteAppleAdsAdGroupRequestSchema,
+			DeleteAppleAdsAdGroupResponseSchema,
 		)
 	}
 

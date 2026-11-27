@@ -1,11 +1,42 @@
 import { z } from 'zod'
-import { IdempotencyKey } from './write'
+import { IdempotencyKey, PreviewToken } from './write'
 
 const EntityId = z.union([
 	z.number().int().positive(),
 	z.string().regex(/^\d+$/, 'Entity ID must be numeric.'),
 ])
 const MatchTypeEnum = z.enum(['EXACT', 'BROAD'])
+
+/**
+ * Money goes out in the Apple Ads account's own currency, which the API reads from Apple and keeps on
+ * the connection. There is no currency input: Apple refuses any other code, and the old `USD`
+ * default made every budget and bid change on a non-USD account fail.
+ */
+const AccountMoney = z
+	.number()
+	.positive()
+	.describe(
+		"Amount in the Apple Ads account's own currency; AppActor reads that currency from Apple, so there is no currency field.",
+	)
+
+// Its own base, not AccountMoney with a second .describe(): a wrapper's description is published
+// alongside the inner one, not instead of it.
+const AdGroupBidUpdate = z
+	.number()
+	.positive()
+	.describe(
+		"New default max cost-per-tap bid, in the Apple Ads account's own currency. Refused when the campaign uses automated bidding (MAX_CONVERSIONS): its ad groups take their bids from the campaign's strategy.",
+	)
+
+const CampaignStartTime = z
+	.string()
+	.describe('Start date and time in UTC, e.g. 2026-12-01T00:00:00.000.')
+const CampaignEndTime = z
+	.string()
+	.nullable()
+	.describe(
+		'End date and time in UTC, e.g. 2026-12-31T23:59:59.000; null means no end date.',
+	)
 
 // ── Base & Credential Selection ─────────────────────────────────────────────
 
@@ -135,7 +166,7 @@ export const AppleAdsCampaignSchema = z.object({
 	name: z.string(),
 	status: z.string(),
 	dailyBudget: z.number(),
-	currency: z.string().default('USD'),
+	currency: z.string(),
 	countriesOrRegions: z.array(z.string()).optional(),
 	countries: z.array(z.string()).optional(),
 	adamId: z.union([z.number(), z.string()]).optional(),
@@ -179,22 +210,23 @@ export const ManageAppleAdsCampaignRequestSchema = z.discriminatedUnion(
 			action: z.literal('create'),
 			idempotencyKey: IdempotencyKey,
 			name: z.string().min(1).max(255),
-			dailyBudget: z.number().positive(),
-			currency: z.string().length(3).default('USD'),
+			dailyBudget: AccountMoney,
 			countriesOrRegions: z.array(z.string().length(2)).min(1),
 			adamId: EntityId,
 			supplySources: z.array(z.string()).optional(),
-			startTime: z.string().optional(),
-			endTime: z.string().nullable().optional(),
+			startTime: CampaignStartTime.optional(),
+			endTime: CampaignEndTime.optional(),
 		}),
 		AppleAdsSelectorSchema.extend({
 			action: z.literal('update'),
 			idempotencyKey: IdempotencyKey,
 			campaignId: EntityId,
 			name: z.string().min(1).max(255).optional(),
-			dailyBudget: z.number().positive().optional(),
+			dailyBudget: AccountMoney.optional(),
 			countriesOrRegions: z.array(z.string().length(2)).min(1).optional(),
 			status: z.enum(['ENABLED', 'PAUSED']).optional(),
+			startTime: CampaignStartTime.optional(),
+			endTime: CampaignEndTime.optional(),
 		}),
 		AppleAdsSelectorSchema.extend({
 			action: z.literal('pause'),
@@ -203,11 +235,6 @@ export const ManageAppleAdsCampaignRequestSchema = z.discriminatedUnion(
 		}),
 		AppleAdsSelectorSchema.extend({
 			action: z.literal('resume'),
-			idempotencyKey: IdempotencyKey,
-			campaignId: EntityId,
-		}),
-		AppleAdsSelectorSchema.extend({
-			action: z.literal('delete'),
 			idempotencyKey: IdempotencyKey,
 			campaignId: EntityId,
 		}),
@@ -276,8 +303,7 @@ export const ManageAppleAdsAdGroupRequestSchema = z.discriminatedUnion(
 			idempotencyKey: IdempotencyKey,
 			campaignId: EntityId,
 			name: z.string().min(1).max(255),
-			defaultBid: z.number().positive(),
-			currency: z.string().length(3).default('USD'),
+			defaultBid: AccountMoney,
 			cpaGoal: z.number().positive().optional(),
 			searchMatch: z.boolean().default(false),
 			startTime: z.string().optional(),
@@ -289,7 +315,7 @@ export const ManageAppleAdsAdGroupRequestSchema = z.discriminatedUnion(
 			idempotencyKey: IdempotencyKey,
 			adGroupId: EntityId,
 			name: z.string().min(1).max(255).optional(),
-			defaultBid: z.number().positive().optional(),
+			defaultBid: AdGroupBidUpdate.optional(),
 			cpaGoal: z.number().positive().nullable().optional(),
 			searchMatch: z.boolean().optional(),
 			status: z.enum(['ENABLED', 'PAUSED']).optional(),
@@ -301,11 +327,6 @@ export const ManageAppleAdsAdGroupRequestSchema = z.discriminatedUnion(
 		}),
 		AppleAdsSelectorSchema.extend({
 			action: z.literal('resume'),
-			idempotencyKey: IdempotencyKey,
-			adGroupId: EntityId,
-		}),
-		AppleAdsSelectorSchema.extend({
-			action: z.literal('delete'),
 			idempotencyKey: IdempotencyKey,
 			adGroupId: EntityId,
 		}),
@@ -374,17 +395,15 @@ export const ManageAppleAdsKeywordRequestSchema = z.discriminatedUnion(
 			idempotencyKey: IdempotencyKey,
 			adGroupId: EntityId,
 			text: z.string().min(1),
-			bid: z.number().positive(),
+			bid: AccountMoney,
 			matchType: MatchTypeEnum.default('EXACT'),
-			currency: z.string().length(3).default('USD'),
 			status: z.enum(['ACTIVE', 'ENABLED', 'PAUSED']).default('ACTIVE'),
 		}),
 		AppleAdsSelectorSchema.extend({
 			action: z.literal('update_bid'),
 			idempotencyKey: IdempotencyKey,
 			keywordId: EntityId,
-			bid: z.number().positive(),
-			currency: z.string().length(3).default('USD'),
+			bid: AccountMoney,
 		}),
 		AppleAdsSelectorSchema.extend({
 			action: z.literal('pause'),
@@ -467,13 +486,24 @@ export const ManageAppleAdsNegativeKeywordRequestSchema = z.discriminatedUnion(
 			idempotencyKey: IdempotencyKey,
 			text: z.string().min(1),
 			matchType: MatchTypeEnum.default('EXACT'),
-			campaignId: EntityId.describe(
-				'Campaign ID. Omit adGroupId to create a campaign-level negative keyword, or pass adGroupId as well to scope it to one ad group.',
+			campaignId: EntityId.optional().describe(
+				'For a campaign-level negative keyword: the campaign ID, sent without adGroupId.',
 			),
 			adGroupId: EntityId.optional().describe(
-				'Optional ad group ID. Omit for a campaign-level negative keyword (matched by campaignId with adGroupId IS_NULL on uncertain retries); pass with campaignId for an adgroup-level negative keyword.',
+				'For an ad group-level negative keyword: the ad group ID, sent without campaignId. Apple does not allow campaignId on an ad group-level negative.',
 			),
-		}),
+		}).refine(
+			// Apple's NegativeKeywordCreate: campaignId "must not be set" on an ad group-level negative.
+			// Sending both used to be what this tool told the model to do.
+			(request) =>
+				(request.campaignId === undefined) !==
+				(request.adGroupId === undefined),
+			{
+				message:
+					'Send exactly one of campaignId (campaign-level negative) or adGroupId (ad group-level negative).',
+				path: ['adGroupId'],
+			},
+		),
 		AppleAdsSelectorSchema.extend({
 			action: z.literal('delete'),
 			idempotencyKey: IdempotencyKey,
@@ -497,4 +527,53 @@ export const ManageAppleAdsNegativeKeywordResponseSchema = z.object({
 })
 export type ManageAppleAdsNegativeKeywordResponse = z.infer<
 	typeof ManageAppleAdsNegativeKeywordResponseSchema
+>
+
+// ── Deletes: preview, then apply in a later turn ────────────────────────────
+
+const AppleAdsDeleteConfirmName = z
+	.string()
+	.min(1)
+	.max(255)
+	.describe(
+		"The campaign or ad group name exactly as the preview reported it, typed back by the user. Never invent this value or copy it from the preview on the user's behalf.",
+	)
+
+// No entity id: the token carries the campaign or ad group it was signed for, as delete_project's
+// apply carries no projectId.
+const AppleAdsDeleteApplySchema = AppleAdsSelectorSchema.extend({
+	action: z.literal('apply'),
+	idempotencyKey: IdempotencyKey,
+	previewToken: PreviewToken,
+	confirmName: AppleAdsDeleteConfirmName,
+}).strict()
+
+export const DeleteAppleAdsCampaignRequestSchema = z.discriminatedUnion(
+	'action',
+	[
+		AppleAdsSelectorSchema.extend({
+			action: z.literal('preview'),
+			campaignId: EntityId.describe(
+				'Campaign ID from get_apple_ads_campaigns.',
+			),
+		}).strict(),
+		AppleAdsDeleteApplySchema,
+	],
+)
+export type DeleteAppleAdsCampaignRequest = z.infer<
+	typeof DeleteAppleAdsCampaignRequestSchema
+>
+
+export const DeleteAppleAdsAdGroupRequestSchema = z.discriminatedUnion(
+	'action',
+	[
+		AppleAdsSelectorSchema.extend({
+			action: z.literal('preview'),
+			adGroupId: EntityId.describe('Ad group ID from get_apple_ads_adgroups.'),
+		}).strict(),
+		AppleAdsDeleteApplySchema,
+	],
+)
+export type DeleteAppleAdsAdGroupRequest = z.infer<
+	typeof DeleteAppleAdsAdGroupRequestSchema
 >

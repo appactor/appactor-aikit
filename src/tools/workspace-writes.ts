@@ -38,9 +38,9 @@ import {
 export const DELETE_CONFIRMATION_RULE =
 	'Call action "apply" only in a LATER turn, with confirmName set to the name the user typed in a new message of their own. The name they used when asking for the deletion does not count, nor does any name already in this conversation, nor the one in the preview. If there is no interactive user — an unattended or automated run — do not call apply at all; say deletion needs a person and stop.'
 
-const DELETE_PROTOCOL = `Two steps. First call action "preview" for the blast radius and a previewToken that expires in five minutes. Show it and END YOUR TURN. ${DELETE_CONFIRMATION_RULE} This cannot be undone.`
+export const DELETE_PROTOCOL = `Two steps. First call action "preview" for the blast radius and a previewToken that expires in five minutes. Show it and END YOUR TURN. ${DELETE_CONFIRMATION_RULE} This cannot be undone.`
 
-const DELETE_STOP_REMINDER = `STOP HERE. End your turn with this text and wait. ${DELETE_CONFIRMATION_RULE}`
+export const DELETE_STOP_REMINDER = `STOP HERE. End your turn with this text and wait. ${DELETE_CONFIRMATION_RULE}`
 
 const DELETE_PROJECT_DESCRIPTION = `Permanently delete a project and everything inside it: every app, product, subscriber, purchase, remote config, experiment and customer token balance, plus the analytics history. ${DELETE_PROTOCOL}`
 
@@ -72,7 +72,7 @@ function createSummary(
 	return warning ? `${created} ${warning}` : created
 }
 
-function countLabel(value: { count: number; atLeast: boolean }) {
+export function countLabel(value: { count: number; atLeast: boolean }) {
 	return value.atLeast ? `${value.count}+` : `${value.count}`
 }
 
